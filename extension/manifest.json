@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Celora Solana Wallet",
+  "version": "1.0.0",
+  "description": "Secure Solana wallet integrated with Celora platform",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "notifications",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*.supabase.co/*",
+    "https://api.devnet.solana.com/*",
+    "https://api.mainnet-beta.solana.com/*",
+    "https://zpcycakwdvymqhwvakrv.supabase.co/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "lib/config.js",
+        "lib/transaction-cache.js", 
+        "lib/spl-tokens.js",
+        "content/content-script.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; object-src 'self'"
+  },
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["content/provider.js", "assets/*", "popup/connection-approval.html", "popup/transaction-approval.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

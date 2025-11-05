@@ -14,8 +14,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    console.log('🔍 Admin login attempt for:', email);
-
     // First, check if user exists in our database directly (bypassing auth)
     const { data: userRecord, error: userError } = await supabaseAdmin
       .from('user_profiles')
@@ -24,11 +22,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !userRecord) {
-      console.log('❌ User not found:', userError?.message || 'No user record');
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
-
-    console.log('✅ User found in database');
 
     // Use admin client to sign in directly (bypasses rate limits since it's service role)
     const { data: adminSignIn, error: adminSignInError } = await supabaseAdmin.auth.signInWithPassword({
@@ -37,11 +32,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (adminSignInError || !adminSignIn.session) {
-      console.log('❌ Admin sign in failed:', adminSignInError?.message);
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
-
-    console.log('✅ Admin sign in successful');
 
     return NextResponse.json({
       success: true,
@@ -59,7 +51,7 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (err) {
-    console.error('💥 Admin login error:', err);
+    // Log error without exposing details to client
     return NextResponse.json({ error: 'Server error during login' }, { status: 500 });
   }
 }

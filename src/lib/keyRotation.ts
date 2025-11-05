@@ -359,9 +359,12 @@ export class KeyRotationManager {
    */
   private encryptKey(key: string): string {
     // In production, replace with proper encryption using HSM or KMS
-    // This is a placeholder implementation
     const crypto = require('crypto');
-    const masterKey = process.env.MASTER_ENCRYPTION_KEY || 'default-master-key-replace-in-production';
+    const masterKey = process.env.MASTER_ENCRYPTION_KEY;
+    
+    if (!masterKey) {
+      throw new Error('MASTER_ENCRYPTION_KEY environment variable is required for key encryption');
+    }
     
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(
@@ -383,9 +386,12 @@ export class KeyRotationManager {
    */
   private decryptKey(encryptedKey: string): string {
     // In production, replace with proper decryption using HSM or KMS
-    // This is a placeholder implementation
     const crypto = require('crypto');
-    const masterKey = process.env.MASTER_ENCRYPTION_KEY || 'default-master-key-replace-in-production';
+    const masterKey = process.env.MASTER_ENCRYPTION_KEY;
+    
+    if (!masterKey) {
+      throw new Error('MASTER_ENCRYPTION_KEY environment variable is required for key decryption');
+    }
     
     const [ivBase64, authTagBase64, encryptedData] = encryptedKey.split(':');
     

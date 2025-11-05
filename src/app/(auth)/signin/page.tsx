@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { authService, User } from '@/lib/auth';
 import { validateSeedPhrase, BIP39_WORDS } from '@/lib/seedPhrase';
 import MFAVerification from '@/components/MFAVerification';
@@ -217,8 +218,13 @@ export default function SignInPage() {
   };
 
   return (
-  <div className="min-h-screen bg-black text-white flex items-center justify-center px-4 py-6 sm:py-10">
-      <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 to-blue-950/20 gradient-bg crt-overlay"></div>
+  <div className="min-h-screen bg-gradient-to-br from-black via-blue-950/30 to-purple-950/30 text-white flex items-center justify-center px-4 py-6 sm:py-10 relative overflow-hidden">
+      {/* Animated background effects */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-br from-cyan-950/10 to-purple-950/10"></div>
+      </div>
   <div className="relative z-10 w-full max-w-md sm:max-w-lg">
         {requiresMFA ? (
           <motion.div
@@ -236,45 +242,56 @@ export default function SignInPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card bg-dark-card/50 backdrop-blur border border-cyan-400/20 rounded-lg p-6 sm:p-8 subtle-glow"
+          className="bg-black/60 backdrop-blur-xl border-2 border-cyan-400/30 rounded-2xl p-6 sm:p-8 shadow-[0_0_80px_rgba(6,182,212,0.3)]"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(6,24,44,0.8) 100%)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 0 80px rgba(6,182,212,0.3), inset 0 0 40px rgba(6,182,212,0.05)',
+          }}
         >
-          {/* Header with Logo */}
+          {/* Header with Logo - FULL CELORA DESIGN */}
           <div className="text-center mb-8">
-            <div className="mb-6 flex justify-center">
-              <div className="relative w-32 h-32">
-                {/* Animated glow effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/40 to-cyan-400/40 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute inset-0 bg-cyan-400/20 rounded-full blur-xl animate-ping" style={{ animationDuration: '3s' }}></div>
-                {/* Logo */}
-                <img 
-                  src="/celora-logo.svg" 
-                  alt="Celora Logo" 
-                  className="relative z-10 w-full h-full object-contain animate-neon-pulse"
+            <div className="mb-4 flex justify-center">
+              <div className="relative w-56 h-56">
+                {/* Background glow effects */}
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/30 to-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute inset-0 bg-cyan-400/20 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+
+                {/* Use static logo from public */}
+                <Image
+                  src="/celora-logo-full.svg"
+                  alt="Celora"
+                  width={224}
+                  height={224}
+                  priority
+                  className="absolute inset-0 w-full h-full"
                 />
               </div>
             </div>
-            <h1 className="text-3xl font-mono font-bold text-cyan-400 mb-2 neon-text">CELORA</h1>
-            <p className="text-gray-400">Access Your Wallet</p>
+            <h1 className="text-4xl font-mono font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent mb-2 drop-shadow-[0_0_20px_rgba(6,182,212,0.8)]">
+              CELORA
+            </h1>
+            <p className="text-cyan-300/80 font-mono text-sm tracking-wider">SECURE WALLET ACCESS</p>
           </div>
 
           {/* Auth Method Selector */}
-          <div className="flex mb-6 bg-gray-800/50 rounded-lg p-1 border border-cyan-400/20">
+          <div className="flex mb-6 bg-black/50 rounded-lg p-1 border-2 border-cyan-400/30 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
             <button
               onClick={() => setAuthMethod('email')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-mono transition-all ${
+              className={`flex-1 py-3 px-4 rounded-md text-sm font-mono transition-all ${
                 authMethod === 'email'
-                  ? 'bg-cyan-400/20 text-cyan-400 text-shadow-neon'
-                  : 'text-gray-400 hover:text-cyan-400'
+                  ? 'bg-gradient-to-r from-cyan-400/30 to-blue-400/30 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-400/50'
+                  : 'text-gray-400 hover:text-cyan-400 hover:bg-cyan-400/10'
               }`}
             >
               EMAIL LOGIN
             </button>
             <button
               onClick={() => setAuthMethod('seedphrase')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-mono transition-all ${
+              className={`flex-1 py-3 px-4 rounded-md text-sm font-mono transition-all ${
                 authMethod === 'seedphrase'
-                  ? 'bg-cyan-400/20 text-cyan-400 text-shadow-neon'
-                  : 'text-gray-400 hover:text-cyan-400'
+                  ? 'bg-gradient-to-r from-cyan-400/30 to-blue-400/30 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-400/50'
+                  : 'text-gray-400 hover:text-cyan-400 hover:bg-cyan-400/10'
               }`}
             >
               SEED PHRASE
@@ -282,17 +299,21 @@ export default function SignInPage() {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-md shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-4 p-4 bg-red-500/10 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.3)] backdrop-blur"
+            >
               <p className="text-red-400 text-sm mb-2 font-mono">{error}</p>
               {error.includes('rate limit') || error.includes('too many') ? (
                 <button
                   onClick={clearAndRetry}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 underline text-shadow-neon"
+                  className="text-xs text-cyan-400 hover:text-cyan-300 underline drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]"
                 >
                   Clear Cache & Retry
                 </button>
               ) : null}
-            </div>
+            </motion.div>
           )}
 
           {/* Email Login Form */}
@@ -304,33 +325,34 @@ export default function SignInPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-sm font-mono text-cyan-400 mb-2 accent-text">EMAIL</label>
+                <label className="block text-sm font-mono text-cyan-400 mb-2 tracking-wider drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]">EMAIL</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full neon-input bg-gray-800/50 border border-gray-600 rounded-md px-3 py-3 text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none"
+                  className="w-full bg-black/50 border-2 border-cyan-400/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-400 focus:shadow-[0_0_20px_rgba(6,182,212,0.4)] focus:outline-none transition-all backdrop-blur"
                   placeholder="your@email.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-mono text-cyan-400 mb-2 accent-text">PASSWORD</label>
+                <label className="block text-sm font-mono text-cyan-400 mb-2 tracking-wider drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]">PASSWORD</label>
                   <input
                     type="password"
                     autoComplete="current-password"
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full neon-input bg-gray-800/50 border border-gray-600 rounded-md px-3 py-3 text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none"
+                  className="w-full bg-black/50 border-2 border-cyan-400/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-400 focus:shadow-[0_0_20px_rgba(6,182,212,0.4)] focus:outline-none transition-all backdrop-blur"
                   placeholder="Enter your password"
                 />
               </div>
               <button
                 disabled={loading}
-                className="w-full btn-primary bg-gradient-to-r from-cyan-400 to-emerald-500 hover:from-cyan-300 hover:to-emerald-400 text-gray-900 font-mono font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(10,245,211,0.4)] hover:shadow-[0_0_30px_rgba(10,245,211,0.6)]"
+                className="relative w-full bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 hover:from-cyan-300 hover:via-blue-300 hover:to-purple-400 text-black font-mono font-bold py-4 px-4 rounded-lg transition-all disabled:opacity-50 shadow-[0_0_40px_rgba(6,182,212,0.6)] hover:shadow-[0_0_60px_rgba(6,182,212,0.8)] border-2 border-cyan-300/50 overflow-hidden group"
               >
-                {loading ? 'SIGNING IN...' : 'SIGN IN'}
+                <span className="relative z-10">{loading ? 'SIGNING IN...' : 'SIGN IN'}</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-300/20 to-purple-300/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
               </button>
               
               {/* Quick Register Button */}
@@ -492,25 +514,26 @@ export default function SignInPage() {
               
               <button
                 disabled={loading || !validateSeedPhrase(seedPhrase)}
-                className="w-full btn-primary bg-gradient-to-r from-cyan-400 to-emerald-500 hover:from-cyan-300 hover:to-emerald-400 disabled:from-gray-600 disabled:to-gray-700 text-gray-900 font-mono font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(10,245,211,0.4)] hover:shadow-[0_0_30px_rgba(10,245,211,0.6)]"
+                className="relative w-full bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 hover:from-cyan-300 hover:via-blue-300 hover:to-purple-400 disabled:from-gray-600 disabled:to-gray-700 text-black font-mono font-bold py-4 px-4 rounded-lg transition-all disabled:opacity-50 shadow-[0_0_40px_rgba(6,182,212,0.6)] hover:shadow-[0_0_60px_rgba(6,182,212,0.8)] border-2 border-cyan-300/50 overflow-hidden group"
               >
-                {loading ? 'ACCESSING WALLET...' : 'ACCESS WALLET'}
+                <span className="relative z-10">{loading ? 'ACCESSING WALLET...' : 'ACCESS WALLET'}</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-300/20 to-purple-300/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
               </button>
             </motion.form>
           )}
 
           {/* Footer Links */}
-          <div className="mt-6 pt-6 border-t border-cyan-400/20">
+          <div className="mt-6 pt-6 border-t-2 border-cyan-400/30">
             <div className="flex justify-between text-sm">
               <Link 
                 href="/signup" 
-                className="text-cyan-400 hover:text-cyan-300 font-mono transition-colors text-shadow-neon"
+                className="text-cyan-400 hover:text-cyan-300 font-mono transition-all drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] hover:drop-shadow-[0_0_12px_rgba(6,182,212,1)]"
               >
                 CREATE WALLET
               </Link>
               <Link 
                 href="/reset-password" 
-                className="text-cyan-400 hover:text-cyan-300 font-mono transition-colors text-shadow-neon"
+                className="text-cyan-400 hover:text-cyan-300 font-mono transition-all drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] hover:drop-shadow-[0_0_12px_rgba(6,182,212,1)]"
               >
                 RECOVER WALLET
               </Link>

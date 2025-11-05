@@ -18,8 +18,6 @@ module.exports = {
     'node_modules/',
     '.next/',
     'public/',
-    'dist/',
-    'src/lib/advancedEncryption.ts',
-    'src/lib/encryptionManager.ts'
+    'dist/'
   ]
 }

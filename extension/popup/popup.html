@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Celora Wallet</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 360px;
+      min-height: 500px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .logo {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .balance-card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .balance-label {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 5px;
+    }
+
+    .balance-amount {
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .balance-usd {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+
+    .wallet-address {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      word-break: break-all;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      margin-left: 10px;
+    }
+
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 5px;
+      opacity: 0.9;
+    }
+
+    .input-group input,
+    .input-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .input-group textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .input-group input::placeholder,
+    .input-group textarea::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: white;
+      color: #667eea;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      margin-top: 10px;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .action-btn {
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .error-message {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fecaca;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .success-message {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.5);
+      color: #bbf7d0;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .transaction-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .transaction-item {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      opacity: 0.7;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tab.active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .fee-estimate {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🔷 Celora</div>
+      <div class="subtitle">Solana Wallet Extension</div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen active">
+      <div class="error-message" id="loginError"></div>
+      
+      <div class="tabs">
+        <button class="tab active" onclick="switchAuthTab('login')">Login</button>
+        <button class="tab" onclick="switchAuthTab('register')">Register</button>
+      </div>
+
+      <div id="loginForm">
+        <div class="input-group">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="your@email.com">
+        </div>
+        <div class="input-group">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••">
+        </div>
+        <button class="btn btn-primary" onclick="handleLogin()">Login</button>
+      </div>
+
+      <div id="registerForm" style="display: none;">
+        <div class="input-group">
+          <label>Email</label>
+          <input type="email" id="registerEmail" placeholder="your@email.com">
+        </div>
+        <div class="input-group">
+          <label>Password (min 8 characters)</label>
+          <input type="password" id="registerPassword" placeholder="••••••••">
+        </div>
+        <button class="btn btn-primary" onclick="handleRegister()">Create Wallet</button>
+        <button class="btn btn-secondary" onclick="showImportScreen()">Import Existing Wallet</button>
+      </div>
+    </div>
+
+    <!-- Import Wallet Screen -->
+    <div id="importScreen" class="screen">
+      <div class="error-message" id="importError"></div>
+      <div class="success-message" id="importSuccess"></div>
+      
+      <div class="input-group">
+        <label>Email</label>
+        <input type="email" id="importEmail" placeholder="your@email.com">
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="importPassword" placeholder="••••••••">
+      </div>
+      <div class="input-group">
+        <label>Seed Phrase (12 words)</label>
+        <textarea id="importSeed" placeholder="word1 word2 word3 ..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button>
+      <button class="btn btn-secondary" onclick="showLoginScreen()">Back to Login</button>
+    </div>
+
+    <!-- Main Wallet Screen -->
+    <div id="walletScreen" class="screen">
+      <div class="balance-card">
+        <div class="balance-label">Total Balance</div>
+        <div class="balance-amount" id="balance">0.00 SOL</div>
+        <div class="balance-usd" id="balanceUSD">$0.00 USD</div>
+      </div>
+
+      <div class="wallet-address">
+        <span id="walletAddress">Loading...</span>
+        <button class="copy-btn" onclick="copyAddress()">Copy</button>
+      </div>
+
+      <div class="action-buttons">
+        <button class="action-btn" onclick="showSendScreen()">📤 Send</button>
+        <button class="action-btn" onclick="refreshBalance()">🔄 Refresh</button>
+      </div>
+
+      <div class="transaction-list" id="transactionList">
+        <div class="loading">No recent transactions</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button class="btn btn-secondary" onclick="lockWallet()">🔒 Lock</button>
+        <button class="btn btn-secondary" onclick="handleLogout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- Send Screen -->
+    <div id="sendScreen" class="screen">
+      <div class="error-message" id="sendError"></div>
+      <div class="success-message" id="sendSuccess"></div>
+      
+      <div class="input-group">
+        <label>Recipient Address</label>
+        <input type="text" id="recipientAddress" placeholder="Solana address">
+      </div>
+      <div class="input-group">
+        <label>Amount (SOL)</label>
+        <input type="number" id="sendAmount" step="0.01" placeholder="0.00" oninput="updateFeeEstimate()">
+      </div>
+      
+      <div id="feeEstimate" class="fee-estimate" style="display: none;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span>Amount:</span>
+          <span id="feeAmount">0 SOL</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span>Network Fee:</span>
+          <span id="feeNetwork">~0.000005 SOL</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 5px;">
+          <span>Total:</span>
+          <span id="feeTotal">0 SOL</span>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="handleSend()">Send Transaction</button>
+      <button class="btn btn-secondary" onclick="showWalletScreen()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Load External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/src/index.js"></script>
+  <script src="../lib/bip39-wordlist.js"></script>
+  <script src="../lib/crypto.js"></script>
+  <script src="../lib/solana.js"></script>
+  <script src="../lib/config.js"></script>
+  <script src="../lib/transaction-cache.js"></script>
+  <script src="../lib/spl-tokens.js"></script>
+  <script src="popup.js"></script>
+  
+  <!-- Store full address for copy functionality -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const walletAddressEl = document.getElementById('walletAddress');
+      if (walletAddressEl) {
+        walletAddressEl.setAttribute('data-full-address', '');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Celora Companion</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body data-app-url="https://app.celora.azure" data-api-base="">
+    <div id="root"></div>
+    <script>
+      (function () {
+        var appUrl = document.body.dataset.appUrl || 'https://app.celora.azure';
+        var apiBase = document.body.dataset.apiBase;
+        if (appUrl.endsWith('/')) {
+          appUrl = appUrl.slice(0, -1);
+        }
+        window.__CELORA_APP_URL__ = appUrl;
+        window.__CELORA_API_BASE__ = apiBase || appUrl + '/api';
+      })();
+    </script>
+    <script src="dist/popup.js"></script>
+  </body>
+</html>
+

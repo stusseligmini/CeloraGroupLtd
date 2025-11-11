@@ -1,273 +1,179 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { notificationManager, NotificationType } from '@/lib/notificationManager';
-import { featureFlags } from '@/lib/featureFlags';
+import { fetchNotifications } from '@/server/services/notificationService';
+import {
+  NotificationListQuerySchema,
+  NotificationResponseSchema,
+  NotificationMarkAsReadRequestSchema,
+} from '@/lib/validation/schemas';
+import {
+  validateQuery,
+  validateBody,
+  ValidationError,
+  validationErrorResponse,
+  errorResponse,
+  successResponse,
+} from '@/lib/validation/validate';
+import { z } from 'zod';
+
+const allowedOrigins = new Set(
+  [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_EXTENSION_ORIGIN]
+    .filter((value): value is string => Boolean(value))
+);
+
+function resolveAllowedOrigin(request: NextRequest): string | null {
+  const origin = request.headers.get('origin');
+  if (!origin) {
+    return process.env.NEXT_PUBLIC_APP_URL ?? '*';
+  }
+
+  if (allowedOrigins.size === 0) {
+    return origin;
+  }
+
+  if (allowedOrigins.has(origin)) {
+    return origin;
+  }
+
+  return null;
+}
+
+function withCors(response: NextResponse, request: NextRequest): NextResponse {
+  const origin = resolveAllowedOrigin(request);
+
+  if (origin) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.set('Vary', 'Origin');
+  } else {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+  }
+
+  response.headers.set('Access-Control-Allow-Headers', 'authorization, content-type');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  return response;
+}
+
+function extractBearerToken(header: string | null): string | null {
+  if (!header) return null;
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
+}
+
+export async function OPTIONS(request: NextRequest) {
+  const response = new NextResponse(null, { status: 204 });
+  return withCors(response, request);
+}
 
 export async function GET(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+
   try {
-    // Initialize feature flags
-    await featureFlags.initialize();
-    
-    // Check if notifications API is enabled
-    const apiEnabled = featureFlags.isEnabled('notifications_api', { defaultValue: true });
-    if (!apiEnabled) {
-      return NextResponse.json(
-        { success: false, error: 'Notifications API is disabled' },
-        { status: 403 }
-      );
-    }
-    
-    // Get the current user from Supabase
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    const { data: { user } } = await supabase.auth.getUser();
+    // Validate query parameters
+    const query = validateQuery(request, NotificationListQuerySchema);
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Update feature flags with user context
-    await featureFlags.initialize({
-      userId: user.id,
-      email: user.email,
-      role: user.app_metadata?.role
-    });
+    const token = extractBearerToken(request.headers.get('authorization'));
+    const notifications = await fetchNotifications(token, query);
 
-    // Get URL parameters
-    const url = new URL(request.url);
-    const limit = parseInt(url.searchParams.get('limit') || '50');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
-    const includeRead = url.searchParams.get('includeRead') !== 'false';
+    // Validate response array
+    const validatedNotifications = z.array(NotificationResponseSchema).parse(notifications);
 
-    // Get notifications from the notification manager
-    const notifications = await notificationManager.getNotifications(
-      user.id,
-      limit,
-      offset,
-      includeRead
+    const response = successResponse(
+      {
+        notifications: validatedNotifications,
+        pagination: {
+          page: query.page,
+          limit: query.limit,
+          total: notifications.length,
+        },
+      },
+      200,
+      requestId
     );
 
-    // Get unread count
-    const unreadCount = await notificationManager.getUnreadCount(user.id);
-
-    // Get user preferences
-    const preferences = await notificationManager.getUserPreferences(user.id);
-
-    // Transform notifications to match the legacy format
-    const legacyNotifications = notifications.map(notification => ({
-      id: notification.id,
-      type: notification.type,
-      title: notification.payload.title,
-      message: notification.payload.body,
-      timestamp: notification.createdAt,
-      read: notification.read,
-      priority: notification.priority,
-      metadata: notification.payload.data || {},
-      action_url: notification.payload.link || notification.payload.action?.url
-    }));
-
-    // Count notifications by category
-    const categories = legacyNotifications.reduce((acc, notification) => {
-      const type = notification.type;
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Transform preferences to match the legacy format
-    const settings = {
-      pushEnabled: preferences?.channels.system?.push || false,
-      emailEnabled: preferences?.channels.system?.email || false,
-      smsEnabled: preferences?.channels.system?.sms || false,
-      categories: Object.entries(preferences?.channels || {}).reduce((acc, [type, channels]) => {
-        acc[type] = channels?.in_app || false;
-        return acc;
-      }, {} as Record<string, boolean>)
-    };
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        notifications: legacyNotifications,
-        unreadCount,
-        total: notifications.length,
-        categories,
-        settings
-      },
-      timestamp: new Date().toISOString()
-    });
-
+    return withCors(response, request);
   } catch (error) {
-    console.error('Error fetching notifications:', error);
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to fetch notifications' 
-      },
-      { status: 500 }
+    if (error instanceof ValidationError) {
+      return withCors(validationErrorResponse(error, requestId), request);
+    }
+
+    console.error('[Notifications GET Error]', error);
+    const response = errorResponse(
+      'INTERNAL_SERVER_ERROR',
+      'Failed to fetch notifications',
+      500,
+      process.env.NODE_ENV === 'development' ? error : undefined,
+      requestId
     );
+    return withCors(response, request);
   }
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+
   try {
-    // Initialize feature flags
-    await featureFlags.initialize();
-    
-    // Check if notifications API is enabled
-    const apiEnabled = featureFlags.isEnabled('notifications_api', { defaultValue: true });
-    if (!apiEnabled) {
-      return NextResponse.json(
-        { success: false, error: 'Notifications API is disabled' },
-        { status: 403 }
+    // Validate request body
+    const body = await validateBody(request, NotificationMarkAsReadRequestSchema);
+
+    // Get user ID from token
+    const token = extractBearerToken(request.headers.get('authorization'));
+    if (!token) {
+      const response = errorResponse(
+        'UNAUTHORIZED',
+        'Authentication required',
+        401,
+        undefined,
+        requestId
       );
+      return withCors(response, request);
     }
+
+    // Mark notifications as read in database
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
     
-    const body = await request.json();
-    
-    // Get the current user from Supabase
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Update feature flags with user context
-    await featureFlags.initialize({
-      userId: user.id,
-      email: user.email,
-      role: user.app_metadata?.role
-    });
-
-    const { action, notificationId, settings, type, title, message, priority = 'medium', link, data } = body;
-
-    // Mark a notification as read
-    if (action === 'mark_read' && notificationId) {
-      const success = await notificationManager.markAsRead(notificationId);
-      
-      if (!success) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to mark notification as read' },
-          { status: 500 }
-        );
-      }
-      
-      return NextResponse.json({
-        success: true,
-        message: `Notification ${notificationId} marked as read`,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Mark all notifications as read
-    if (action === 'mark_all_read') {
-      // Get all unread notifications
-      const notifications = await notificationManager.getNotifications(user.id, 1000, 0, false);
-      
-      // Mark each notification as read
-      const results = await Promise.all(
-        notifications.map(notification => notificationManager.markAsRead(notification.id))
-      );
-      
-      if (results.some(success => !success)) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to mark all notifications as read' },
-          { status: 500 }
-        );
-      }
-      
-      return NextResponse.json({
-        success: true,
-        message: 'All notifications marked as read',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Update notification settings
-    if (action === 'update_settings' && settings) {
-      const success = await notificationManager.updatePreferences(user.id, settings);
-      
-      if (!success) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to update notification settings' },
-          { status: 500 }
-        );
-      }
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Notification settings updated successfully',
-        data: settings,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Create a new notification
-    if (!action && type && title && message) {
-      const notification = await notificationManager.sendNotification(
-        user.id,
-        type as NotificationType,
-        'in_app',
-        {
-          title,
-          body: message,
-          link,
-          data
+    try {
+      const result = await prisma.notification.updateMany({
+        where: {
+          id: { in: body.notificationIds },
+          // TODO: Add userId filter when we decode JWT to get userId
         },
-        priority as any
-      );
-      
-      if (!notification) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to create notification' },
-          { status: 500 }
-        );
-      }
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Notification created successfully',
         data: {
-          id: notification.id,
-          type: notification.type,
-          title: notification.payload.title,
-          message: notification.payload.body,
-          timestamp: notification.createdAt,
-          read: notification.read,
-          priority: notification.priority,
-          metadata: notification.payload.data || {},
-          action_url: notification.payload.link || notification.payload.action?.url
+          status: 'read',
+          readAt: new Date(),
         },
-        timestamp: new Date().toISOString()
       });
+
+      await prisma.$disconnect();
+
+      const response = successResponse(
+        {
+          success: true,
+          message: `${result.count} notification(s) marked as read`,
+          count: result.count,
+          timestamp: new Date().toISOString(),
+        },
+        200,
+        requestId
+      );
+
+      return withCors(response, request);
+    } finally {
+      await prisma.$disconnect();
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return withCors(validationErrorResponse(error, requestId), request);
     }
 
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Invalid action or missing parameters' 
-      },
-      { status: 400 }
+    console.error('[Notifications POST Error]', error);
+    const response = errorResponse(
+      'INTERNAL_SERVER_ERROR',
+      'Failed to update notifications',
+      500,
+      process.env.NODE_ENV === 'development' ? error : undefined,
+      requestId
     );
-
-  } catch (error) {
-    console.error('Error processing notification action:', error);
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to process notification action' 
-      },
-      { status: 500 }
-    );
+    return withCors(response, request);
   }
 }

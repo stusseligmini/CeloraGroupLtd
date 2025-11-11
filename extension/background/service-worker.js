@@ -1,370 +1,373 @@
-// Celora Wallet Extension - Background Service Worker
-// Handles background operations, notifications, and state management
+/**
+ * Celora Extension - Background Service Worker (MV3)
+ * 
+ * Secure message handling between popup and content scripts
+ */
 
-// Import required scripts for production operations
-importScripts('../lib/config.js');
-importScripts('../lib/solana.js');
-importScripts('../lib/crypto.js');
+// Message types enum
+const MessageType = {
+  GET_WALLET_DATA: 'GET_WALLET_DATA',
+  WALLET_DATA_RESPONSE: 'WALLET_DATA_RESPONSE',
+  GET_NOTIFICATIONS: 'GET_NOTIFICATIONS',
+  NOTIFICATIONS_RESPONSE: 'NOTIFICATIONS_RESPONSE',
+  SIGN_TRANSACTION: 'SIGN_TRANSACTION',
+  TRANSACTION_SIGNED: 'TRANSACTION_SIGNED',
+  CONNECT_WALLET: 'CONNECT_WALLET',
+  WALLET_CONNECTED: 'WALLET_CONNECTED',
+  DISCONNECT_WALLET: 'DISCONNECT_WALLET',
+  WALLET_DISCONNECTED: 'WALLET_DISCONNECTED',
+  ERROR: 'ERROR',
+};
 
-console.log('Celora Wallet Service Worker initialized');
-
-// Store pending connection requests
-const pendingConnections = new Map();
-const pendingTransactions = new Map();
-
-// Listen for extension installation
-chrome.runtime.onInstalled.addListener(async (details) => {
-  if (details.reason === 'install') {
-    console.log('Celora Wallet installed');
-    
-    // Set default settings
-    await chrome.storage.local.set({
-      network: 'devnet',
-      autoLock: true,
-      lockTimeout: 15 // minutes
-    });
+// Security: Validate message origin
+function isValidOrigin(url) {
+  try {
+    const origin = new URL(url).origin;
+    const allowedOrigins = [
+      'https://app.celora.azure',
+      'https://celora.azurewebsites.net',
+      'https://api.celora.azure',
+      chrome.runtime.getURL(''),
+    ];
+    return allowedOrigins.some((allowed) => origin.startsWith(allowed.replace(/\/$/, '')));
+  } catch {
+    return false;
   }
-});
+}
 
-// Listen for messages from popup or content scripts
+// Security: Validate message structure
+function validateMessage(message) {
+  if (!message || typeof message !== 'object') {
+    return false;
+  }
+  if (!message.type || typeof message.type !== 'string') {
+    return false;
+  }
+  if (!Object.values(MessageType).includes(message.type)) {
+    return false;
+  }
+  return true;
+}
+
+// Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Received message:', message);
-  
+  // Validate sender origin
+  if (sender.url && !isValidOrigin(sender.url)) {
+    console.warn('[BG] Invalid sender origin:', sender.url);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: 'Invalid origin',
+    });
+    return false;
+  }
+
+  // Validate message structure
+  if (!validateMessage(message)) {
+    console.warn('[BG] Invalid message structure:', message);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: 'Invalid message format',
+    });
+    return false;
+  }
+
+  // Handle message based on type
   switch (message.type) {
-    case 'SIGN_TRANSACTION':
-      handleSignTransaction(message.data, sendResponse);
+    case MessageType.GET_WALLET_DATA:
+      handleGetWalletData(message, sender, sendResponse);
       return true; // Keep channel open for async response
-      
-    case 'CONNECT_WALLET':
-      handleConnectWallet(message.data, sendResponse);
+
+    case MessageType.GET_NOTIFICATIONS:
+      handleGetNotifications(message, sender, sendResponse);
       return true;
-      
-    case 'GET_BALANCE':
-      handleGetBalance(sendResponse);
+
+    case MessageType.SIGN_TRANSACTION:
+      handleSignTransaction(message, sender, sendResponse);
       return true;
-      
-    case 'SIGN_MESSAGE':
-      handleSignMessage(message.data, sendResponse);
+
+    case MessageType.CONNECT_WALLET:
+      handleConnectWallet(message, sender, sendResponse);
       return true;
-      
-    case 'TRANSACTION_UPDATE':
-      handleTransactionUpdate(message.data);
-      break;
-      
-    case 'CONNECTION_APPROVED':
-    case 'CONNECTION_REJECTED':
-      handleConnectionResponse(message.data);
-      break;
-      
-    case 'TRANSACTION_APPROVED':
-    case 'TRANSACTION_REJECTED':
-      handleTransactionResponse(message.data);
-      break;
-      
+
+    case MessageType.DISCONNECT_WALLET:
+      handleDisconnectWallet(message, sender, sendResponse);
+      return true;
+
     default:
-      console.warn('Unknown message type:', message.type);
+      console.warn('[BG] Unknown message type:', message.type);
+      sendResponse({
+        type: MessageType.ERROR,
+        error: 'Unknown message type',
+      });
+      return false;
   }
 });
 
-// Handle transaction signing requests from dApps
-async function handleSignTransaction(data, sendResponse) {
+// Fetch wallet data from API
+async function handleGetWalletData(message, sender, sendResponse) {
   try {
-    const { transaction, origin } = data;
-    
-    // Get current wallet from storage
-    const { walletAddress, seedPhrase } = await chrome.storage.local.get(['walletAddress', 'seedPhrase']);
-    
-    if (!walletAddress || !seedPhrase) {
-      sendResponse({ success: false, error: 'No wallet found' });
-      return;
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('Not authenticated');
     }
-    
-    // Show notification to user for approval
-    const approved = await showTransactionApproval(transaction, origin);
-    
-    if (!approved) {
-      sendResponse({ success: false, error: 'Transaction rejected by user' });
-      return;
-    }
-    
-    // PRODUCTION: Use real Solana Web3.js to sign and send transaction
-    if (typeof SolanaService === 'undefined') {
-      throw new Error('SolanaService not available - cannot sign transaction');
-    }
-    
-    const keypair = await SolanaService.keypairFromSeed(seedPhrase);
-    const signature = await SolanaService.sendTransaction(keypair, transaction.recipient, transaction.amount);
-    
-    sendResponse({
-      success: true,
-      signature
-    });
-    
-  } catch (error) {
-    console.error('Error signing transaction:', error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
 
-// Handle wallet connection requests from dApps
-async function handleConnectWallet(data, sendResponse) {
-  try {
-    const { origin } = data;
-    
-    // Get current wallet
-    const { walletAddress } = await chrome.storage.local.get(['walletAddress']);
-    
-    if (!walletAddress) {
-      sendResponse({ success: false, error: 'No wallet found' });
-      return;
-    }
-    
-    // Check if this origin is already connected
-    const { connectedSites = {} } = await chrome.storage.local.get(['connectedSites']);
-    
-    if (connectedSites[origin]) {
-      sendResponse({ success: true, address: walletAddress });
-      return;
-    }
-    
-    // Show connection approval
-    const approved = await showConnectionApproval(origin);
-    
-    if (!approved) {
-      sendResponse({ success: false, error: 'Connection rejected by user' });
-      return;
-    }
-    
-    // Store connected site
-    connectedSites[origin] = {
-      address: walletAddress,
-      connectedAt: Date.now()
-    };
-    
-    await chrome.storage.local.set({ connectedSites });
-    
-    sendResponse({
-      success: true,
-      address: walletAddress
-    });
-    
-  } catch (error) {
-    console.error('Error connecting wallet:', error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
-
-// Handle balance requests
-async function handleGetBalance(sendResponse) {
-  try {
-    const { walletAddress } = await chrome.storage.local.get(['walletAddress']);
-    
-    if (!walletAddress) {
-      sendResponse({ success: false, error: 'No wallet found' });
-      return;
-    }
-    
-    // PRODUCTION: Fetch real balance from Solana network
-    if (typeof SolanaService === 'undefined') {
-      throw new Error('SolanaService not available - cannot fetch balance');
-    }
-    
-    const balance = await SolanaService.getBalance(walletAddress);
-    
-    sendResponse({
-      success: true,
-      balance
-    });
-    
-  } catch (error) {
-    console.error('Error getting balance:', error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
-
-// Handle transaction status updates
-function handleTransactionUpdate(data) {
-  const { signature, status } = data;
-  
-  // Show notification
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: '/icons/icon48.png',
-    title: 'Transaction Update',
-    message: `Transaction ${signature.substring(0, 8)}... is ${status}`
-  });
-}
-
-// Show transaction approval popup
-async function showTransactionApproval(transaction, origin) {
-  return new Promise((resolve, reject) => {
-    const requestId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(7);
-    
-    // Store the resolver for this request
-    pendingTransactions.set(requestId, { resolve, reject });
-    
-    // Create popup URL with parameters
-    const txData = encodeURIComponent(JSON.stringify({
-      transaction,
-      origin,
-      requestId
-    }));
-    
-    const popupUrl = chrome.runtime.getURL(
-      `popup/transaction-approval.html?data=${txData}`
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/wallet/summary`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
     );
-    
-    // Open popup window
-    chrome.windows.create({
-      url: popupUrl,
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    sendResponse({
+      type: MessageType.WALLET_DATA_RESPONSE,
+      data,
+    });
+  } catch (error) {
+    console.error('[BG] Failed to fetch wallet data:', error);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: error.message,
+    });
+  }
+}
+
+// Fetch notifications from API
+async function handleGetNotifications(message, sender, sendResponse) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const { limit = 10, unreadOnly = false } = message.payload || {};
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      ...(unreadOnly && { unreadOnly: 'true' }),
+    });
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/notifications?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    sendResponse({
+      type: MessageType.NOTIFICATIONS_RESPONSE,
+      data,
+    });
+  } catch (error) {
+    console.error('[BG] Failed to fetch notifications:', error);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: error.message,
+    });
+  }
+}
+
+// Handle transaction signing
+async function handleSignTransaction(message, sender, sendResponse) {
+  try {
+    const { transaction, metadata } = message.payload || {};
+    if (!transaction) {
+      throw new Error('No transaction provided');
+    }
+
+    // Store transaction for approval UI
+    const approvalId = generateApprovalId();
+    await chrome.storage.local.set({
+      [`approval_${approvalId}`]: {
+        transaction,
+        metadata,
+        timestamp: Date.now(),
+        sender: sender.url,
+      },
+    });
+
+    // Open approval popup
+    await chrome.windows.create({
+      url: chrome.runtime.getURL(`popup/transaction-approval.html?id=${approvalId}`),
       type: 'popup',
       width: 400,
       height: 600,
-      focused: true
-    }, (window) => {
-      if (chrome.runtime.lastError) {
-        pendingTransactions.delete(requestId);
-        reject(new Error('Failed to open approval popup'));
-        return;
-      }
-      
-      // Set timeout for user response (60 seconds)
-      setTimeout(() => {
-        if (pendingTransactions.has(requestId)) {
-          pendingTransactions.delete(requestId);
-          resolve(false); // Default to rejection on timeout
-        }
-      }, 60000);
     });
-  });
-}
 
-// Show connection approval popup
-async function showConnectionApproval(origin) {
-  return new Promise((resolve, reject) => {
-    const requestId = 'conn_' + Date.now() + '_' + Math.random().toString(36).substring(7);
-    
-    // Store the resolver for this request
-    pendingConnections.set(requestId, { resolve, reject });
-    
-    // Create popup URL with parameters
-    const popupUrl = chrome.runtime.getURL(
-      `popup/connection-approval.html?origin=${encodeURIComponent(origin)}&requestId=${requestId}`
-    );
-    
-    // Open popup window
-    chrome.windows.create({
-      url: popupUrl,
-      type: 'popup',
-      width: 400,
-      height: 500,
-      focused: true
-    }, (window) => {
-      if (chrome.runtime.lastError) {
-        pendingConnections.delete(requestId);
-        reject(new Error('Failed to open approval popup'));
-        return;
-      }
-      
-      // Set timeout for user response (60 seconds)
-      setTimeout(() => {
-        if (pendingConnections.has(requestId)) {
-          pendingConnections.delete(requestId);
-          resolve(false); // Default to rejection on timeout
-        }
-      }, 60000);
-    });
-  });
-}
+    // Wait for approval (will be handled by approval popup)
+    const approval = await waitForApproval(approvalId);
 
-// Handle message signing
-async function handleSignMessage(data, sendResponse) {
-  try {
-    const { message } = data;
-    
-    // Get wallet keypair
-    const { seedPhrase } = await chrome.storage.local.get(['seedPhrase']);
-    if (!seedPhrase) {
-      sendResponse({ success: false, error: 'Wallet locked - no seed phrase available' });
-      return;
-    }
-    
-    // PRODUCTION: Use real Solana message signing
-    if (typeof SolanaService === 'undefined') {
-      throw new Error('SolanaService not available - cannot sign message');
-    }
-    
-    const keypair = await SolanaService.keypairFromSeed(seedPhrase);
-    const signature = await SolanaService.signMessage(message, keypair);
-    
-    sendResponse({
-      success: true,
-      signature
-    });
-    
-  } catch (error) {
-    console.error('Message signing error:', error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
-
-// Periodic balance updates (every 30 seconds)
-setInterval(async () => {
-  const { walletAddress } = await chrome.storage.local.get(['walletAddress']);
-  
-  if (walletAddress) {
-    // In production, fetch real balance from Solana network
-    // await updateBalance(walletAddress);
-  }
-}, 30000);
-
-// Auto-lock functionality
-let lockTimer = null;
-
-function resetLockTimer() {
-  const { autoLock, lockTimeout } = chrome.storage.local.get(['autoLock', 'lockTimeout']);
-  
-  if (!autoLock) return;
-  
-  if (lockTimer) clearTimeout(lockTimer);
-  
-  lockTimer = setTimeout(() => {
-    // Lock the wallet by clearing sensitive data
-    chrome.storage.local.remove(['seedPhrase']);
-    console.log('Wallet auto-locked');
-  }, (lockTimeout || 15) * 60 * 1000);
-}
-
-// Handle connection approval/rejection responses
-function handleConnectionResponse(data) {
-  const { requestId, approved } = data;
-  
-  if (pendingConnections.has(requestId)) {
-    const { resolve } = pendingConnections.get(requestId);
-    pendingConnections.delete(requestId);
-    resolve(approved);
-  }
-}
-
-// Handle transaction approval/rejection responses
-function handleTransactionResponse(data) {
-  const { requestId, approved, signedTransaction } = data;
-  
-  if (pendingTransactions.has(requestId)) {
-    const { resolve } = pendingTransactions.get(requestId);
-    pendingTransactions.delete(requestId);
-    
-    if (approved && signedTransaction) {
-      resolve(signedTransaction);
+    if (approval.approved) {
+      sendResponse({
+        type: MessageType.TRANSACTION_SIGNED,
+        signature: approval.signature,
+      });
     } else {
-      resolve(false);
+      throw new Error('Transaction rejected by user');
     }
+  } catch (error) {
+    console.error('[BG] Failed to sign transaction:', error);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: error.message,
+    });
   }
 }
 
-// Reset lock timer on user activity
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === 'USER_ACTIVITY') {
-    resetLockTimer();
+// Handle wallet connection
+async function handleConnectWallet(message, sender, sendResponse) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    // Store connected origin
+    const { origin } = new URL(sender.url);
+    await chrome.storage.local.set({
+      connectedOrigins: {
+        [origin]: {
+          connected: true,
+          timestamp: Date.now(),
+        },
+      },
+    });
+
+    sendResponse({
+      type: MessageType.WALLET_CONNECTED,
+      origin,
+    });
+  } catch (error) {
+    console.error('[BG] Failed to connect wallet:', error);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: error.message,
+    });
+  }
+}
+
+// Handle wallet disconnection
+async function handleDisconnectWallet(message, sender, sendResponse) {
+  try {
+    const { origin } = new URL(sender.url);
+    await chrome.storage.local.remove(`connectedOrigins.${origin}`);
+
+    sendResponse({
+      type: MessageType.WALLET_DISCONNECTED,
+      origin,
+    });
+  } catch (error) {
+    console.error('[BG] Failed to disconnect wallet:', error);
+    sendResponse({
+      type: MessageType.ERROR,
+      error: error.message,
+    });
+  }
+}
+
+// Helper: Get auth token from storage
+async function getAuthToken() {
+  const result = await chrome.storage.local.get(['authToken']);
+  return result.authToken || null;
+}
+
+// Helper: Generate approval ID
+function generateApprovalId() {
+  return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Helper: Wait for approval
+function waitForApproval(approvalId, timeout = 60000) {
+  return new Promise((resolve, reject) => {
+    const checkInterval = 500;
+    let elapsed = 0;
+
+    const interval = setInterval(async () => {
+      elapsed += checkInterval;
+
+      if (elapsed >= timeout) {
+        clearInterval(interval);
+        reject(new Error('Approval timeout'));
+        return;
+      }
+
+      const result = await chrome.storage.local.get([`approval_result_${approvalId}`]);
+      const approval = result[`approval_result_${approvalId}`];
+
+      if (approval) {
+        clearInterval(interval);
+        await chrome.storage.local.remove([
+          `approval_${approvalId}`,
+          `approval_result_${approvalId}`,
+        ]);
+        resolve(approval);
+      }
+    }, checkInterval);
+  });
+}
+
+// Periodic cleanup of expired approvals
+chrome.alarms.create('cleanupApprovals', { periodInMinutes: 5 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'cleanupApprovals') {
+    cleanupExpiredApprovals();
+  }
+});
+
+async function cleanupExpiredApprovals() {
+  const storage = await chrome.storage.local.get(null);
+  const now = Date.now();
+  const maxAge = 10 * 60 * 1000; // 10 minutes
+
+  const keysToRemove = Object.keys(storage)
+    .filter((key) => {
+      if (key.startsWith('approval_')) {
+        const approval = storage[key];
+        return approval.timestamp && now - approval.timestamp > maxAge;
+      }
+      return false;
+    });
+
+  if (keysToRemove.length > 0) {
+    await chrome.storage.local.remove(keysToRemove);
+    console.log('[BG] Cleaned up expired approvals:', keysToRemove.length);
+  }
+}
+
+// Initialize service worker
+console.log('[BG] Service worker initialized');
+
+// Keep service worker alive
+chrome.runtime.onStartup.addListener(() => {
+  console.log('[BG] Extension started');
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('[BG] Extension installed:', details.reason);
+  
+  if (details.reason === 'install') {
+    // First install
+    chrome.storage.local.set({
+      installTimestamp: Date.now(),
+      version: chrome.runtime.getManifest().version,
+    });
+  } else if (details.reason === 'update') {
+    // Update
+    console.log('[BG] Extension updated to:', chrome.runtime.getManifest().version);
   }
 });

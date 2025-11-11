@@ -1,16 +1,37 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.npm/
+.yarn/
+.cache-loader/
 
 # Build outputs
 .next/
 .turbo/
 dist/
 .build/
+build/
+out/
+storybook-static/
+playwright-report/
+test-results/
+cypress/screenshots/
+cypress/videos/
 
 # Environment variables
 .env*
 !.env.example
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+.envrc
+.env.*.local
+*.secret
+*.secrets
+*.pem
+*.key
+*.crt
 
 # Testing
 coverage/
@@ -22,10 +43,17 @@ coverage/
 *.swp
 *.swo
 *~
+.fleet/
+.vscode-test/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
 
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Logs
 *.log
@@ -33,26 +61,39 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+logs/
 
 # Temporary files
 *.tmp
 *.temp
+tmp/
 
 # Package manager
 pnpm-lock.yaml
 yarn.lock
+package-lock.json
+.npmrc
+.yarnrc
+.pnp.*
 
 # Misc
 .cache/
 .parcel-cache/
 .vercel
-
-# Deployment documentation (local only)
-VERCEL_DEPLOYMENT_GUIDE.md
-QUICK_DEPLOY_CHECKLIST.md
-ENV_CONFIGURATION_SUMMARY.md
-PRODUCTION_DEPLOYMENT_GUIDE.md
-PRODUCTION_READY_NO_DEMO.md
-DEPLOY_TO_PRODUCTION.md
-PRODUCTION_READINESS_STATUS.md
-production-keys.txt
+*.sqlite
+*.sqlite3
+*.db
+*.pid
+*.pid.lock
+*.seed
+# Terraform state & sensitive files
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

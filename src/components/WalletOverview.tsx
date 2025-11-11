@@ -1,83 +1,74 @@
 'use client';
 
 import React from 'react';
-import { useSupabase } from '../providers/SupabaseProvider';
+import { useAuthContext } from '../providers/AuthProvider';
+import { useWalletSummary } from '@/hooks/useWalletSummary';
+import { formatCurrency } from '@/lib/ui/formatters';
 
 export function WalletOverview() {
-  const { user, loading } = useSupabase();
-
-  if (loading) {
-    return (
-      <div className="bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-neon-sm border border-cyan-primary/20 p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-800/50 rounded mb-4"></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="h-20 bg-gray-800/50 rounded-lg"></div>
-            <div className="h-20 bg-gray-800/50 rounded-lg"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { user } = useAuthContext();
+  const { summary, loading, error, refresh } = useWalletSummary();
 
   if (!user) {
     return (
-      <div className="bg-gray-900/70 backdrop-blur-sm rounded-lg shadow-neon-sm border border-cyan-primary/20 p-6">
-        <h2 className="text-lg font-medium text-cyan-primary neon-text mb-4">Account Overview</h2>
-        <p className="text-gray-400 mb-4">Please sign in to view your account details.</p>
-        <button className="w-full bg-cyan-primary/20 border border-cyan-primary/50 text-cyan-primary py-2 px-4 rounded-lg hover:bg-cyan-primary/30 hover:shadow-neon-sm transition-all duration-300">
-          Sign In
-        </button>
-      </div>
+      <section className="cel-card">
+        <header className="cel-card__header">
+          <p className="cel-eyebrow">Wallet</p>
+          <h2 className="cel-title">Account overview</h2>
+        </header>
+        <p className="cel-body">Sign in to view your balances and recent wallet activity.</p>
+      </section>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-lg font-medium text-gray-900 mb-4">Account Overview</h2>
-      
-      <div className="grid grid-cols-1 gap-4">
-        <div className="bg-cyan-primary/10 rounded-lg p-4 border border-cyan-primary/30 hover:shadow-neon-sm transition-all duration-300">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-cyan-primary/30 border border-cyan-primary/50 rounded-full flex items-center justify-center">
-                <span className="text-cyan-primary text-sm font-medium neon-text">$</span>
-              </div>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Total Balance</p>
-              <p className="text-lg font-bold text-cyan-primary neon-text">$0.00 USD</p>
-              <p className="text-xs text-gray-500">Across all virtual cards</p>
-            </div>
-          </div>
+    <section className="cel-card">
+      <header className="cel-card__header">
+        <p className="cel-eyebrow">Wallet</p>
+        <h2 className="cel-title">Account overview</h2>
+        <button type="button" className="cel-button cel-button--ghost" onClick={refresh} disabled={loading}>
+          Refresh
+        </button>
+      </header>
+
+      <div className="cel-card__content">
+        <div className="cel-metric">
+          <span className="cel-metric__label">Total balance</span>
+          <span className="cel-metric__value">
+            {loading ? 'Loading…' : formatCurrency(summary?.totalBalance ?? 0, summary?.currency ?? 'USD')}
+          </span>
+          <span className="cel-metric__caption">{summary?.holdings.length ?? 0} active accounts</span>
         </div>
 
-        <div className="bg-purple-glow/10 rounded-lg p-4 border border-purple-glow/30 hover:shadow-neon-purple-sm transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-glow/30 border border-purple-glow/50 rounded-full flex items-center justify-center">
-                  <span className="text-purple-glow text-sm font-medium">👤</span>
+        <div className="cel-info-block">
+          <span className="cel-info-block__label">Signed in as</span>
+          <span className="cel-info-block__value">{user.email}</span>
+          <span className="cel-info-block__caption">Protected by Azure AD B2C</span>
+        </div>
+
+        {error ? (
+          <p className="cel-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {summary?.holdings?.length ? (
+          <div className="cel-holdings">
+            {summary.holdings.slice(0, 3).map((holding) => (
+              <div key={holding.id} className="cel-holding-row">
+                <div>
+                  <p className="cel-holding-row__title">{holding.label}</p>
+                  <p className="cel-holding-row__caption">{holding.currency}</p>
                 </div>
+                <p className="cel-holding-row__value">{formatCurrency(holding.balance, holding.currency)}</p>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-400">Account</p>
-                <p className="text-sm font-bold text-white">{user.email}</p>
-              </div>
-            </div>
-            <div className="text-cyan-primary text-sm font-medium neon-text">Active</div>
+            ))}
+            {summary.holdings.length > 3 ? (
+              <p className="cel-note">+ {summary.holdings.length - 3} more accounts</p>
+            ) : null}
           </div>
-        </div>
+        ) : null}
       </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <button className="bg-cyan-primary/20 border border-cyan-primary/50 text-cyan-primary py-2 px-4 rounded-lg hover:bg-cyan-primary/30 hover:shadow-neon-sm transition-all duration-300">
-          Add Funds
-        </button>
-        <button className="bg-purple-glow/20 border border-purple-glow/50 text-purple-glow py-2 px-4 rounded-lg hover:bg-purple-glow/30 hover:shadow-neon-purple-sm transition-all duration-300">
-          Transfer
-        </button>
-      </div>
-    </div>
+    </section>
   );
 }

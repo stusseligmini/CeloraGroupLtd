@@ -3,6 +3,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { maskPII } from '../lib/dataMasking';
 import { logError } from '../lib/logger';
+import { trackError } from '../lib/telemetry/appInsights';
 
 interface Props {
   children: ReactNode;
@@ -36,19 +37,36 @@ class ErrorBoundary extends Component<Props, State> {
     // Store errorInfo in state for rendering
     this.setState({ errorInfo });
     
-    // Log error with our secure logger
-    logError(
-      `ErrorBoundary caught an error in ${this.props.componentName || 'unknown component'}`, 
-      {
+    // Track error in Application Insights
+    trackError({
+      error,
+      properties: {
         componentName: this.props.componentName || 'ErrorBoundary',
+        componentStack: errorInfo.componentStack || 'No component stack',
+        errorName: error.name,
       },
-      {
-        errorMessage: maskPII(error.message || ''),
-        componentStack: errorInfo.componentStack ? maskPII(errorInfo.componentStack) : 'No component stack',
-        errorName: error.name
-      },
-      error
-    );
+      severityLevel: 'Error',
+    });
+    
+    // Log error with our secure logger (if available)
+    try {
+      if (typeof logError === 'function') {
+        logError(
+          `ErrorBoundary caught an error in ${this.props.componentName || 'unknown component'}`,
+          error,
+          {
+            componentName: this.props.componentName || 'ErrorBoundary',
+            errorMessage: typeof maskPII === 'function' ? maskPII(error.message || '') : error.message,
+            componentStack: errorInfo.componentStack ? 
+              (typeof maskPII === 'function' ? maskPII(errorInfo.componentStack) : errorInfo.componentStack) : 
+              'No component stack',
+            errorName: error.name
+          }
+        );
+      }
+    } catch (loggerError) {
+      console.error('[ErrorBoundary] Logger failed:', loggerError);
+    }
     
     // Call custom error handler if provided
     if (this.props.onError) {

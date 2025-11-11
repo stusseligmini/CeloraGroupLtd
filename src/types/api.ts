@@ -86,6 +86,7 @@ export enum HttpStatusCode {
   METHOD_NOT_ALLOWED = 405,
   CONFLICT = 409,
   UNPROCESSABLE_ENTITY = 422,
+  TOO_MANY_REQUESTS = 429,
   INTERNAL_SERVER_ERROR = 500,
   SERVICE_UNAVAILABLE = 503,
 }
@@ -185,4 +186,141 @@ export class RequestValidator {
       errors,
     };
   }
+}
+
+// Domain-specific API contracts
+export interface NotificationItem {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+  severity?: 'info' | 'warning' | 'critical';
+}
+
+export interface NotificationFeedResponse extends ApiResponse {
+  notifications: NotificationItem[];
+}
+
+export interface WalletHolding {
+  id: string;
+  label: string;
+  balance: number;
+  currency: string;
+}
+
+export interface WalletSummary {
+  totalBalance: number;
+  currency: string;
+  holdings: WalletHolding[];
+  lastUpdated: string;
+}
+
+export interface WalletSummaryResponse extends ApiResponse {
+  summary: WalletSummary;
+}
+
+// Virtual card types
+export interface VirtualCard {
+  id: string;
+  userId: string;
+  walletId: string;
+  nickname?: string;
+  brand: 'VISA' | 'MASTERCARD';
+  type: 'virtual' | 'physical';
+  
+  // Masked card details
+  lastFourDigits: string;
+  cardholderName: string;
+  expiryMonth: number;
+  expiryYear: number;
+  
+  // Limits
+  spendingLimit?: number;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+  totalSpent: number;
+  monthlySpent: number;
+  
+  // Status and controls
+  status: 'active' | 'frozen' | 'cancelled';
+  isOnline: boolean;
+  isContactless: boolean;
+  isATM: boolean;
+  
+  // Timestamps
+  lastUsedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  activatedAt?: string;
+}
+
+export interface CardDetails extends VirtualCard {
+  // Full details (only returned when explicitly requested)
+  cardNumber: string; // Decrypted for display
+  cvv: string; // Decrypted for display
+}
+
+export interface CreateCardRequest {
+  walletId: string;
+  nickname?: string;
+  brand?: 'VISA' | 'MASTERCARD';
+  type?: 'virtual' | 'physical';
+  spendingLimit?: number;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+}
+
+export interface UpdateCardRequest {
+  nickname?: string;
+  status?: 'active' | 'frozen' | 'cancelled';
+  isOnline?: boolean;
+  isContactless?: boolean;
+  isATM?: boolean;
+  spendingLimit?: number;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+}
+
+export interface CardListResponse extends ApiResponse {
+  cards: VirtualCard[];
+}
+
+export interface CardDetailsResponse extends ApiResponse {
+  card: CardDetails;
+}
+
+// Hidden vault types
+export interface VaultWallet {
+  id: string;
+  blockchain: string;
+  address: string;
+  label?: string;
+  vaultLevel: number; // 0=normal, 1=hidden, 2=deep
+  balanceCache?: string;
+  balanceFiat?: number;
+  lastSyncedAt?: string;
+}
+
+export interface UnlockVaultRequest {
+  walletId: string;
+  pin: string;
+}
+
+export interface UnlockVaultResponse extends ApiResponse {
+  token: string; // Session token for vault access
+  expiresAt: string;
+}
+
+export interface SetVaultPinRequest {
+  walletId: string;
+  pin: string;
+  confirmPin: string;
+}
+
+export interface VaultStatusResponse extends ApiResponse {
+  isHidden: boolean;
+  vaultLevel: number;
+  hasPinSet: boolean;
+  isUnlocked: boolean;
 }

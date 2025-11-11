@@ -1,0 +1,62 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '20.x'
+  AZURE_WEBAPP_NAME: 'celora-web-staging'
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: 
+      name: staging
+      url: https://celora-web-staging.azurewebsites.net
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+          SKIP_ENV_VALIDATION: 'true'
+
+      - name: Create deployment package
+        run: |
+          tar -czf celora-staging.tgz .next package.json package-lock.json public node_modules
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_STAGING }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: celora-staging.tgz
+
+      - name: Logout from Azure
+        run: az logout
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Deployment to Staging completed!"
+          echo "🌐 URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+          echo "📦 Build: ${{ github.sha }}"
+          echo "🔗 Commit: ${{ github.event.head_commit.message }}"
+

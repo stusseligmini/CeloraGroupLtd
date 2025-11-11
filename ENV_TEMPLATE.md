@@ -1,81 +1,97 @@
-# 📝 Environment Variables Setup
+# 📝 Environment Variables (Azure Stack)
 
-## Setup Instructions
-
-1. Create a file named `.env.local` in the root of your project
-2. Copy the template below into that file
-3. Fill in your actual values
+## Setup
+1. Copy this template to `.env.local`
+2. Replace placeholder values with your Azure credentials
+3. Restart dev server `npm run dev`
 
 ---
 
-## `.env.local` Template
-
 ```env
-# =============================================================================
-# SUPABASE CONFIGURATION
-# =============================================================================
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-
-# =============================================================================
-# SOLANA CONFIGURATION  
-# =============================================================================
-# QuikNode RPC Endpoints
-NEXT_PUBLIC_SOLANA_RPC_URL=https://your-endpoint.solana-mainnet.quiknode.pro/your-token/
-NEXT_PUBLIC_SOLANA_RPC_DEVNET=https://your-endpoint.solana-devnet.quiknode.pro/your-token/
-NEXT_PUBLIC_SOLANA_RPC_TESTNET=https://your-endpoint.solana-testnet.quiknode.pro/your-token/
-
-# =============================================================================
-# ENCRYPTION & SECURITY (REQUIRED!)
-# =============================================================================
-# Generate a strong 32+ character random string
-MASTER_ENCRYPTION_KEY=your-very-long-secure-random-string-min-32-characters
-
-# JWT Secret for sessions
-JWT_SECRET=your-jwt-secret-key-here
-
-# =============================================================================
-# APPLICATION
-# =============================================================================
+# ============================================================================
+# PLATFORM ENDPOINTS
+# ============================================================================
+PLATFORM_API_BASE_URL=https://api.celora.azure
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_EXTENSION_ORIGIN=chrome-extension://replace-with-extension-id
+
+# ============================================================================
+# AUTH (Azure AD B2C)
+# ============================================================================
+NEXT_PUBLIC_AZURE_B2C_TENANT=celora
+NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN=celora.b2clogin.com
+NEXT_PUBLIC_AZURE_B2C_SIGNIN_POLICY=B2C_1_SUSI
+NEXT_PUBLIC_AZURE_B2C_PASSWORD_RESET_POLICY=B2C_1_PASSWORDRESET
+NEXT_PUBLIC_AZURE_B2C_CLIENT_ID=replace-with-b2c-spa-client-id
+NEXT_PUBLIC_AZURE_B2C_API_SCOPE=https://celora.onmicrosoft.com/api/user_impersonation
+NEXT_PUBLIC_AZURE_B2C_REDIRECT_URI=http://localhost:3000
+NEXT_PUBLIC_AZURE_B2C_LOGOUT_URI=http://localhost:3000
+
+AZURE_B2C_CLIENT_ID=replace-with-b2c-confidential-client-id
+AZURE_B2C_CLIENT_SECRET=replace-with-b2c-confidential-client-secret
+AZURE_B2C_TENANT_ID=replace-with-azure-tenant-id
+
+# ============================================================================
+# STORAGE (Azure Storage Account)
+# ============================================================================
+AZURE_STORAGE_ACCOUNT=celorastorageprod
+AZURE_STORAGE_KEY=replace-with-storage-key
+AZURE_BLOB_CONTAINER=celora-artifacts
+
+# ============================================================================
+# NOTIFICATIONS / PUSH
+# ============================================================================
+NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
+WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
+
+# ============================================================================
+# ENCRYPTION & SECURITY
+# ============================================================================
+MASTER_ENCRYPTION_KEY=generate-64-char-secret
+WALLET_ENCRYPTION_KEY=generate-64-char-secret
+SESSION_COOKIE_SECRET=generate-32-char-secret
+PAYMENT_PROCESSOR_WEBHOOK_SECRET=replace-with-payment-processor-secret
+AZURE_KEY_VAULT_URL=https://your-key-vault.vault.azure.net/
+AZURE_REDIS_CONNECTION_STRING=replace-with-redis-connection-string
+
+# ============================================================================
+# SOLANA CONFIGURATION
+# ============================================================================
+SOLANA_RPC_URL=https://your-quicknode-mainnet-url
+SOLANA_WSS_URL=wss://your-quicknode-mainnet-url
+SOLANA_DEVNET_RPC_URL=https://your-quicknode-devnet-url
+SOLANA_DEVNET_WSS_URL=wss://your-quicknode-devnet-url
+
+# ============================================================================
+# TELEMETRY & LOGGING
+# ============================================================================
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.celora.azure
+APPLICATION_INSIGHTS_CONNECTION_STRING=replace-with-appinsights-connection-string
+
+# ============================================================================
+# FEATURE FLAGS / DEFAULTS
+# ============================================================================
+ENABLE_SOLANA_INGESTION=true
+ENABLE_FRAUD_MONITORING=true
+CASHBACK_TOKEN=CELO
 NODE_ENV=development
 ```
 
 ---
 
-## 🔐 How to Generate Secure Keys
+## 🔐 Key Generation Tips
+- `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- `openssl rand -hex 32`
 
-### Option 1: Using Node.js
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### Option 2: Using OpenSSL
-```bash
-openssl rand -hex 32
-```
-
-### Option 3: Using PowerShell
-```powershell
--join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_})
-```
-
----
-
-## ⚠️ Important Notes
-
-- **NEVER** commit `.env.local` to version control
-- Generate NEW keys for production (don't reuse development keys)
-- `MASTER_ENCRYPTION_KEY` must be at least 32 characters
-- Keep your Supabase service role key SECRET
-
----
+## ⚠️ Notes
+- Never commit `.env.local` to Git.
+- Use separate secrets for staging vs. production.
+- Ensure Azure AD B2C redirect URIs are registered for each environment.
 
 ## ✅ After Setup
-
-1. Create `.env.local` with your values
-2. Restart the dev server: `npm run dev`
-3. Visit `http://localhost:3000/signin`
+1. `npm run dev`
+2. Visit `http://localhost:3000`
+3. Sign in via Azure AD B2C flow
 
 

@@ -5,10 +5,6 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'supabase.com',
-      },
-      {
-        protocol: 'https',
         hostname: 'celora.net',
       },
     ],
@@ -22,9 +18,6 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['framer-motion', 'lucide-react'],
   },
-  
-  // Server external packages (moved from experimental in Next.js 15)
-  serverExternalPackages: ['@supabase/supabase-js'],
   
   // Compiler optimizations
   compiler: {
@@ -101,7 +94,7 @@ const nextConfig = {
     ];
   },
 
-  // No host-level redirects here; manage canonical domain in Vercel settings to avoid loops
+  // Host-level redirects are handled by Azure Front Door; keep Next.js config minimal here
 
   // Webpack configuration for better module resolution and performance
   webpack: (config, { isServer, dev }) => {
@@ -135,13 +128,6 @@ const nextConfig = {
             name: 'vendors',
             chunks: 'all',
             maxSize: 244000, // Keep chunks under 244KB to avoid serialization warnings
-          },
-          supabase: {
-            test: /[\\/]node_modules[\\/]@supabase[\\/]/,
-            name: 'supabase',
-            chunks: 'all',
-            priority: 10,
-            maxSize: 200000,
           },
         },
       };

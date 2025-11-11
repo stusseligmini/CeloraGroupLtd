@@ -1,215 +1,158 @@
+/**
+ * Next.js Middleware with Security Hardening
+ * 
+ * Features:
+ * - Content Security Policy (CSP) with nonce
+ * - CSRF protection (double-submit cookie)
+ * - Rate limiting (Redis-backed)
+ * - Auth validation
+ * - Security headers
+ */
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { SESSION_CONFIG } from './lib/sessionSecurity';
-import { addCspHeaders, generateCspNonce } from './lib/contentSecurityPolicy';
+import { addCspHeaders, generateCspNonce } from './lib/security/contentSecurityPolicy';
+import { csrfMiddleware, setCsrfTokenCookie } from './lib/security/csrfProtection';
+import { rateLimitMiddleware, RateLimitPresets, rateLimit, addRateLimitHeaders } from './lib/security/rateLimit';
+import { decodeJwt } from './lib/jwtUtils';
 
-// Edge runtime compatible UUID generation
+const ACCESS_TOKEN_COOKIE = 'auth-token';
+const ID_TOKEN_COOKIE = 'auth-id-token';
+
+/**
+ * Generate UUID v4
+ */
 function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
 
-// Rate limiting store (in-memory for Edge runtime)
-const rateLimitStore: Record<string, { count: number, resetTime: number }> = {};
+function getUserFromRequest(request: NextRequest) {
+  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const idToken = request.cookies.get(ID_TOKEN_COOKIE)?.value;
+  const token = accessToken || idToken;
+  if (!token) return null;
 
-// Clean up expired rate limit entries periodically
-function cleanupRateLimitStore() {
-  const now = Date.now();
-  Object.keys(rateLimitStore).forEach(key => {
-    if (now > rateLimitStore[key].resetTime) {
-      delete rateLimitStore[key];
-    }
-  });
-}
+  const payload = decodeJwt(token);
+  if (!payload) return null;
 
-// Apply rate limiting based on IP address
-function applyRateLimit(ip: string, path: string, limit = 60, windowMs = 60000): boolean {
-  cleanupRateLimitStore();
-  
-  const now = Date.now();
-  const key = `${ip}:${path}`;
-  
-  if (!rateLimitStore[key]) {
-    rateLimitStore[key] = {
-      count: 0,
-      resetTime: now + windowMs
-    };
+  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    return null;
   }
-  
-  // If window has expired, reset
-  if (now > rateLimitStore[key].resetTime) {
-    rateLimitStore[key] = {
-      count: 0,
-      resetTime: now + windowMs
-    };
-  }
-  
-  // Increment count and check if over limit
-  rateLimitStore[key].count++;
-  return rateLimitStore[key].count <= limit;
+
+  const roles = Array.isArray(payload.roles)
+    ? payload.roles
+    : Array.isArray(payload['extension_Roles'])
+    ? payload['extension_Roles']
+    : [];
+
+  const email = payload.email || payload.preferred_username || (Array.isArray(payload.emails) ? payload.emails[0] : undefined);
+
+  return {
+    id: payload.sub,
+    email,
+    roles,
+    authTime: payload.auth_time ? Number(payload.auth_time) : undefined,
+  };
 }
 
 export async function middleware(request: NextRequest) {
-  // Host canonicalization is handled via Next.js redirects in next.config.js
-  // Handle route conflicts with mfa mobile routes
-  if (request.nextUrl.pathname === '/mfa-recovery-mobile') {
-    return NextResponse.redirect(new URL('/(mfa-mobile)/mfa-recovery-mobile', request.url));
-  }
-  
-  if (request.nextUrl.pathname === '/mfa-verification-mobile') {
-    return NextResponse.redirect(new URL('/(mfa-mobile)/mfa-verification-mobile', request.url));
-  }
-  
-  let response = NextResponse.next();
+  const startTime = Date.now();
   const correlationId = request.headers.get('x-correlation-id') || generateUUID();
-  
-  // Get client IP for rate limiting and security checks
-  const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
   const path = request.nextUrl.pathname;
-  
-  // Apply stricter rate limits to auth routes and API endpoints
+  const method = request.method;
+
+  // === RATE LIMITING ===
   const isAuthRoute = path.startsWith('/signin') || path.startsWith('/signup') || path.startsWith('/api/auth');
   const isApiRoute = path.startsWith('/api/');
-  
-  // Apply rate limiting (more lenient for testing and production use)
-  if (isAuthRoute) {
-    // Relaxed rate limiting for auth routes (100 requests per minute)
-    if (!applyRateLimit(ip, 'auth', 100, 60000)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Too many requests, please try again later' }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-  } else if (isApiRoute) {
-    // Standard rate limiting for API routes (200 requests per minute)
-    if (!applyRateLimit(ip, 'api', 200, 60000)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'API rate limit exceeded' }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-  }
-  
-  // Create Supabase client with secure cookie options
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          // Enhance cookie security
-          const secureOptions = {
-            ...options,
-            secure: process.env.NODE_ENV === 'production', // Secure in production
-            httpOnly: true, // HttpOnly to prevent JS access
-            sameSite: 'lax' as 'lax' // Protect against CSRF
-          };
-          
-          request.cookies.set({ name, value, ...secureOptions });
-          response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value, ...secureOptions });
-        },
-        remove(name: string, options: any) {
-          request.cookies.set({ name, value: '', ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
+  const isWriteOperation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
 
-  // Get the current user and session
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  // Protected routes that require authentication
-  const protectedRoutes = ['/analytics', '/wallet', '/wallets', '/cards', '/transactions', '/settings', '/account', '/admin'];
+  if (isAuthRoute) {
+    const rateLimitResult = await rateLimitMiddleware(request, RateLimitPresets.auth);
+    if (rateLimitResult) return rateLimitResult;
+  } else if (isApiRoute) {
+    const preset = isWriteOperation ? RateLimitPresets.write : RateLimitPresets.read;
+    const rateLimitResult = await rateLimitMiddleware(request, preset);
+    if (rateLimitResult) return rateLimitResult;
+  }
+
+  // === CSRF PROTECTION ===
+  if (isApiRoute) {
+    const csrfResult = csrfMiddleware(request);
+    if (csrfResult) return csrfResult;
+  }
+
+  // === AUTH VALIDATION ===
+  const user = getUserFromRequest(request);
+
+  const protectedRoutes = ['/'];
   const authRoutes = ['/signin', '/signup', '/reset-password', '/update-password'];
-  const sensitiveRoutes = ['/wallet/transfer', '/cards/create', '/settings/security']; // Routes that need extra security
   const currentPath = request.nextUrl.pathname;
 
-  // Skip auth checks for public routes and static assets
-  const publicPaths = ['/api/', '/offline', '/fresh', '/_next/', '/favicon.ico'];
-  const isPublicPath = publicPaths.some(p => currentPath.startsWith(p));
-  
+  const publicPrefixes = ['/api/', '/offline', '/fresh', '/_next/', '/favicon.ico'];
+  const isPublicPath = publicPrefixes.some((prefix) => currentPath.startsWith(prefix));
+
   if (!isPublicPath) {
-    // Check if current path is a protected route that requires auth
-    const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
-    const isAuthRoute = authRoutes.includes(currentPath);
-    
-    // If user is authenticated and trying to access auth pages, redirect to dashboard
-    if (user && isAuthRoute) {
+    const isProtectedRoute = protectedRoutes.some((route) => currentPath.startsWith(route));
+    const isAuthPage = authRoutes.includes(currentPath);
+
+    if (user && isAuthPage) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // If user is not authenticated and trying to access protected routes, redirect to signin
-    // But allow root path to pass through to let Next.js handle it
     if (!user && isProtectedRoute && currentPath !== '/') {
       return NextResponse.redirect(new URL('/signin', request.url));
     }
   }
-  
-  // Session expiry check - if JWT is about to expire, redirect to refresh token
-  if (user && session) {
-    const now = Math.floor(Date.now() / 1000);
-    const expiresAt = session.expires_at || 0;
-    const timeRemaining = expiresAt - now;
-    
-    // If token is about to expire (less than 5 minutes remaining), redirect to token refresh
-    if (timeRemaining < 300 && !currentPath.startsWith('/api/')) {
-      // Only redirect browser requests, not API calls
-      return NextResponse.redirect(new URL('/api/auth/refresh-session?redirect=' + encodeURIComponent(request.url), request.url));
-    }
-  }
-  
-  // Enhanced security for sensitive operations
-  if (user && sensitiveRoutes.includes(currentPath)) {
-    // Check recent authentication time
-    const authTime = session?.user?.last_sign_in_at ? new Date(session.user.last_sign_in_at).getTime() : 0;
-    const now = Date.now();
-    const authAgeInSeconds = (now - authTime) / 1000;
-    
-    // For sensitive operations, require recent authentication (last 30 minutes)
-    if (authAgeInSeconds > SESSION_CONFIG.INACTIVITY_TIMEOUT) {
-      return NextResponse.redirect(new URL('/auth/reauthenticate?redirect=' + encodeURIComponent(request.url), request.url));
-    }
-  }
-  
-  // Add correlation ID to both request and response
+
+  // === BUILD RESPONSE ===
+  const response = NextResponse.next();
+
+  // Add correlation ID
   response.headers.set('x-correlation-id', correlationId);
-  
-  // Generate CSP nonce for inline scripts
+
+  // === CSP + SECURITY HEADERS ===
   const nonce = generateCspNonce();
-  
-  // Apply Content Security Policy and other security headers
-  response = addCspHeaders(response, nonce);
-  
-  // Store nonce in a request header so it can be accessed from server components
-  request.headers.set('x-nonce', nonce);
-  
-  // Add performance timing header
-  const startTime = Date.now();
-  response.headers.set('x-response-time', `${Date.now() - startTime}ms`);
-  
-  // Track user session for security auditing
-  if (user) {
-    response.headers.set('x-user-id', user.id); // For logging purposes
+  const reportOnly = process.env.NODE_ENV === 'development';
+  addCspHeaders(response, nonce, reportOnly);
+
+  // === CSRF TOKEN COOKIE ===
+  // Set/refresh CSRF token cookie on all non-API requests
+  if (!isApiRoute) {
+    setCsrfTokenCookie(response);
   }
-  
+
+  // === RATE LIMIT HEADERS ===
+  // Add rate limit info to API responses
+  if (isApiRoute) {
+    const preset = isWriteOperation ? RateLimitPresets.write : RateLimitPresets.read;
+    const rateLimitInfo = await rateLimit(request, preset);
+    addRateLimitHeaders(response, rateLimitInfo);
+  }
+
+  // === PERFORMANCE METRICS ===
+  const responseTime = Date.now() - startTime;
+  response.headers.set('x-response-time', `${responseTime}ms`);
+
+  // === CACHE CONTROL ===
+  if (!response.headers.has('Cache-Control')) {
+    // Default: no caching for sensitive pages
+    const cacheableRoutes = ['/_next/static', '/public', '/icons', '/images'];
+    const isCacheable = cacheableRoutes.some(route => path.startsWith(route));
+    
+    if (isCacheable) {
+      response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    }
+  }
+
   return response;
 }
 
 export const config = {
-  // Only run middleware on HTML pages, not API routes or static files
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)).*)',
-    '/(api|trpc)(.*)'
-  ]
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt).*)'],
 };

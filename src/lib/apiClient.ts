@@ -1,216 +1,145 @@
-/**
- * API Client with Retry Logic
- * 
- * A centralized client for making API calls with retry capabilities,
- * error handling, and response transformation.
- */
+let authToken: string | null = null;
 
-import { createApiClient, retry } from './apiRetry';
-import { getSupabaseClient } from './supabaseSingleton';
-import { featureFlags } from './featureFlags';
-
-// Import type from apiRetry.ts
-type RetryOptions = {
-  maxRetries?: number;
-  initialDelayMs?: number;
-  backoffFactor?: number;
-  maxDelayMs?: number;
-  isRetryable?: (error: any) => boolean;
-  onRetry?: (attempt: number, error: any, delayMs: number) => void;
-  retryableMethods?: string[];
-  retryableStatusCodes?: number[];
-  timeoutMs?: number;
-};
-
-// Extending Error to include response status and data
-export class ApiError extends Error {
-  status: number;
-  data: any;
-  
-  constructor(message: string, status: number, data: any) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.data = data;
-  }
+export function setApiAuthToken(token: string | null) {
+  authToken = token;
 }
 
-// Default options for API requests
-const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxRetries: 3,
-  initialDelayMs: 500,
-  backoffFactor: 1.5,
-  maxDelayMs: 10000,
-  timeoutMs: 20000,
-  retryableMethods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'],
-  retryableStatusCodes: [408, 429, 500, 502, 503, 504],
-  onRetry: (attempt: number, error: any, delayMs: number) => {
-    console.warn(`Retry attempt ${attempt}, waiting ${delayMs}ms. Error:`, error);
-  },
-};
+function stripTrailingSlash(value: string | undefined | null): string | undefined {
+  if (!value) return value ?? undefined;
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
 
-// Create the base API client
-const apiClient = createApiClient('/api', {
-  headers: {
+function resolveBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    return (
+      stripTrailingSlash(process.env.PLATFORM_API_BASE_URL) ||
+      stripTrailingSlash(process.env.API_BASE_URL) ||
+      '/api'
+    );
+  }
+
+  const runtimeBase = (window as typeof window & { __CELORA_API_BASE__?: string }).__CELORA_API_BASE__;
+  const appUrl = stripTrailingSlash(process.env.NEXT_PUBLIC_APP_URL);
+  const apiBaseEnv = stripTrailingSlash(process.env.NEXT_PUBLIC_API_BASE_URL);
+
+  if (window.location.protocol === 'chrome-extension:') {
+    if (runtimeBase) {
+      return runtimeBase;
+    }
+    if (appUrl) {
+      return `${appUrl}/api`;
+    }
+    if (apiBaseEnv) {
+      return apiBaseEnv;
+    }
+    return '';
+  }
+
+  if (runtimeBase) {
+    return runtimeBase;
+  }
+
+  if (appUrl && window.location.origin === appUrl) {
+    return '/api';
+  }
+
+  return '/api';
+}
+
+function shouldSendCredentials(base: string, initCredentials?: RequestCredentials): RequestCredentials | undefined {
+  if (initCredentials) {
+    return initCredentials;
+  }
+
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  if (!base || base.startsWith('/')) {
+    return 'include';
+  }
+
+  try {
+    const target = new URL(base, window.location.origin);
+    if (target.origin === window.location.origin) {
+      return 'include';
+    }
+  } catch (_error) {
+    // ignore
+  }
+
+  return 'omit';
+}
+
+/**
+ * Get CSRF token from cookie (client-side only)
+ */
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  
+  const match = document.cookie.match(new RegExp(`(^| )celora-csrf-token=([^;]+)`));
+  return match ? match[2] : null;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, init?: RequestInit): Promise<T> {
+  const baseUrl = resolveBaseUrl();
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-  retry: DEFAULT_RETRY_OPTIONS,
-  credentials: 'same-origin',
-});
+    Accept: 'application/json',
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(init?.headers as Record<string, string> | undefined),
+  };
 
-export interface ApiClientOptions {
-  retry?: RetryOptions;
-  throwOnError?: boolean;
-  headers?: Record<string, string>;
+  // Add CSRF token for state-changing methods
+  const statefulMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+  if (statefulMethods.includes(method.toUpperCase())) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers['x-csrf-token'] = csrfToken;
+    }
+  }
+
+  const credentials = shouldSendCredentials(baseUrl, init?.credentials);
+
+  const url = baseUrl ? `${baseUrl}${path}` : path;
+
+  const response = await fetch(url, {
+    method,
+    ...init,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials,
+  });
+
+  const contentType = response.headers.get('content-type');
+  const payload = contentType && contentType.includes('application/json') ? await response.json() : undefined;
+
+  if (!response.ok) {
+    const error = new Error(payload?.error || response.statusText);
+    (error as any).status = response.status;
+    (error as any).data = payload;
+    throw error;
+  }
+
+  return payload as T;
 }
 
-/**
- * Enhanced API client with error handling and response processing
- */
 export const api = {
-  /**
-   * Make a GET request with retry capabilities
-   */
-  async get<T>(path: string, options: ApiClientOptions = {}): Promise<T> {
-    try {
-      // Check if API retry is enabled via feature flag
-      const retryEnabled = await featureFlags.isEnabled('api_retry', { defaultValue: true });
-      const retryOptions = retryEnabled ? options.retry : { maxRetries: 0 };
-      
-      return await apiClient.get<T>(path, {
-        headers: options.headers,
-        retry: retryOptions,
-      });
-    } catch (error) {
-      return handleApiError(error, options.throwOnError);
-    }
+  get<T>(path: string, init?: RequestInit) {
+    return request<T>('GET', path, undefined, init);
   },
-  
-  /**
-   * Make a POST request with retry capabilities
-   */
-  async post<T>(path: string, data: any, options: ApiClientOptions = {}): Promise<T> {
-    try {
-      // POST requests have more limited retry settings by default
-      const retryEnabled = await featureFlags.isEnabled('api_retry', { defaultValue: true });
-      const retryOptions = retryEnabled ? {
-        ...DEFAULT_RETRY_OPTIONS,
-        maxRetries: 2,
-        retryableMethods: ['POST'],
-        ...options.retry,
-      } : { maxRetries: 0 };
-      
-      return await apiClient.post<T>(path, data, {
-        headers: options.headers,
-        retry: retryOptions,
-      });
-    } catch (error) {
-      return handleApiError(error, options.throwOnError);
-    }
+  post<T>(path: string, body: unknown, init?: RequestInit) {
+    return request<T>('POST', path, body, init);
   },
-  
-  /**
-   * Make a PUT request with retry capabilities
-   */
-  async put<T>(path: string, data: any, options: ApiClientOptions = {}): Promise<T> {
-    try {
-      const retryEnabled = await featureFlags.isEnabled('api_retry', { defaultValue: true });
-      const retryOptions = retryEnabled ? options.retry : { maxRetries: 0 };
-      
-      return await apiClient.put<T>(path, data, {
-        headers: options.headers,
-        retry: retryOptions,
-      });
-    } catch (error) {
-      return handleApiError(error, options.throwOnError);
-    }
+  put<T>(path: string, body: unknown, init?: RequestInit) {
+    return request<T>('PUT', path, body, init);
   },
-  
-  /**
-   * Make a DELETE request with retry capabilities
-   */
-  async delete<T>(path: string, options: ApiClientOptions = {}): Promise<T> {
-    try {
-      const retryEnabled = await featureFlags.isEnabled('api_retry', { defaultValue: true });
-      const retryOptions = retryEnabled ? options.retry : { maxRetries: 0 };
-      
-      return await apiClient.delete<T>(path, {
-        headers: options.headers,
-        retry: retryOptions,
-      });
-    } catch (error) {
-      return handleApiError(error, options.throwOnError);
-    }
+  patch<T>(path: string, body: unknown, init?: RequestInit) {
+    return request<T>('PATCH', path, body, init);
   },
-
-  /**
-   * Make a Supabase API call with retry capabilities
-   */
-  supabase: {
-    async query<T>(
-      fn: (client: ReturnType<typeof getSupabaseClient>) => Promise<{ data: T; error: any }>,
-      options: ApiClientOptions = {}
-    ): Promise<T> {
-      const retryEnabled = await featureFlags.isEnabled('api_retry', { defaultValue: true });
-      const retryOptions = {
-        maxRetries: retryEnabled ? (options.retry?.maxRetries || 3) : 0,
-        initialDelayMs: options.retry?.initialDelayMs || 500,
-        backoffFactor: options.retry?.backoffFactor || 1.5,
-        maxDelayMs: options.retry?.maxDelayMs || 10000,
-      };
-      
-      try {
-        return await retry(async () => {
-          const client = getSupabaseClient();
-          const { data, error } = await fn(client);
-          
-          if (error) {
-            throw new ApiError(error.message, error.code || 500, error);
-          }
-          
-          return data as T;
-        }, retryOptions);
-      } catch (error) {
-        return handleApiError(error, options.throwOnError);
-      }
-    },
+  delete<T>(path: string, init?: RequestInit) {
+    return request<T>('DELETE', path, undefined, init);
   },
 };
-
-/**
- * Handle API errors with consistent error processing
- */
-function handleApiError(error: any, throwOnError = true): never {
-  // Transform error into ApiError if it isn't one already
-  let apiError: ApiError;
-  
-  if (error instanceof ApiError) {
-    apiError = error;
-  } else if (error instanceof Response) {
-    apiError = new ApiError(
-      `HTTP error ${error.status}: ${error.statusText}`,
-      error.status,
-      error
-    );
-  } else {
-    apiError = new ApiError(
-      error.message || 'Unknown API error',
-      error.status || 500,
-      error
-    );
-  }
-  
-  // Log the error
-  console.error('API Error:', apiError);
-  
-  // Throw the error if throwOnError is true
-  if (throwOnError) {
-    throw apiError;
-  }
-  
-  // This line is technically unreachable but required by TypeScript
-  throw apiError;
-}
 
 export default api;

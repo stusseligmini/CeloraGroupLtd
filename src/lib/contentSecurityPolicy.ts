@@ -5,8 +5,7 @@
  * by controlling which resources can be loaded and executed in the browser.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getCorrelationId, logSecurity } from './logger';
+import { NextResponse } from 'next/server';
 
 /**
  * CSP configuration settings - customize these based on application requirements
@@ -44,11 +43,7 @@ const cspConfig = {
   ],
   
   // Connect sources (fetch, XHR, WebSocket)
-  'connect-src': [
-    "'self'", 
-    "https://api.celora.app", // Replace with your API domain
-    "wss://api.celora.app", // Replace with your WebSocket domain
-  ],
+  'connect-src': ["'self'", 'https://*.b2clogin.com'],
   
   // Object sources (like <object>, <embed>)
   'object-src': ["'none'"], // Block <object>, <embed>, and <applet> tags
@@ -72,8 +67,6 @@ const cspConfig = {
   'media-src': ["'self'"], // Allow media from same origin
   
   // Report violations to this endpoint
-  'report-uri': ["/api/security/csp-report"], // Endpoint to receive CSP violation reports
-  
   // Report-only mode (set to false to enforce CSP)
   reportOnly: process.env.NODE_ENV === 'development' ? true : false,
   
@@ -148,34 +141,3 @@ export function addCspHeaders(res: NextResponse, nonce?: string): NextResponse {
   return res;
 }
 
-/**
- * Middleware to handle CSP violations reporting
- */
-export async function handleCspViolation(req: NextRequest): Promise<NextResponse> {
-  try {
-    const data = await req.json();
-    const correlationId = getCorrelationId();
-    
-    logSecurity('CSP violation occurred', {
-      correlationId,
-      action: 'csp_violation',
-      componentName: 'CSP'
-    }, data);
-    
-    return NextResponse.json({ received: true }, { status: 204 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Invalid CSP report' }, { status: 400 });
-  }
-}
-
-/**
- * Updates CSP configuration - useful for adjusting CSP settings at runtime
- */
-export function updateCspConfig(updates: Partial<typeof cspConfig>): void {
-  Object.entries(updates).forEach(([key, value]) => {
-    if (key in cspConfig) {
-      // @ts-ignore - Dynamic key access
-      cspConfig[key] = value;
-    }
-  });
-}

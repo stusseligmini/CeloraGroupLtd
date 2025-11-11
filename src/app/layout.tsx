@@ -1,20 +1,15 @@
 import './globals.css'
 import type { Metadata } from 'next'
-import { SpeedInsights } from "@vercel/speed-insights/next"
-import { SupabaseProvider } from '../providers/SupabaseProvider'
+import { AuthProvider } from '../providers/AuthProvider'
 import ErrorBoundary from '../components/ErrorBoundary'
-import NetworkStatusHandler from '../components/NetworkStatusHandler'
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration'
-import PushNotificationRegistration from '../components/PushNotificationRegistration'
+import { TelemetryProvider } from '../components/TelemetryProvider'
 import { headers } from 'next/headers'
 import { CspNonceProvider } from '../lib/cspHelpers'
-import SecurityMonitor from '../components/SecurityMonitor'
-import { FeatureFlagProvider } from '../components/FeatureFlagComponents'
-import { SupabaseInitializer } from './supabase-init'
 
 export const metadata: Metadata = {
-  title: 'Celora - Professional Fintech Platform',
-  description: 'Advanced financial technology platform for virtual cards, cryptocurrency management, and real-time analytics',
+  title: 'Celora',
+  description: 'Mobile-first wallet and notification hub for Celora users',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -67,22 +62,12 @@ export default async function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-96x96.png" />
       </head>
       <body className="min-h-screen bg-slate-900 antialiased">
-        {/* Kjør Supabase-initialisering tidlig i livssyklusen */}
-        <SupabaseInitializer />
-        <ErrorBoundary>
-          <NetworkStatusHandler>
-            <SupabaseProvider>
-              <SecurityMonitor>
-                <FeatureFlagProvider>
-                  {children}
-                </FeatureFlagProvider>
-              </SecurityMonitor>
-            </SupabaseProvider>
-          </NetworkStatusHandler>
-        </ErrorBoundary>
-        <ServiceWorkerRegistration />
-        <PushNotificationRegistration />
-        <SpeedInsights />
+        <TelemetryProvider>
+          <ErrorBoundary>
+            <AuthProvider>{children}</AuthProvider>
+          </ErrorBoundary>
+          <ServiceWorkerRegistration />
+        </TelemetryProvider>
       </body>
     </html>
   )

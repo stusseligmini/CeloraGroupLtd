@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createLogger } from '../lib/logger';
-
-// Create component-specific logger
-const logger = createLogger('ServiceWorkerRegistration');
+import { Workbox } from 'workbox-window';
 
 export default function ServiceWorkerRegistration() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [workbox, setWorkbox] = useState<Workbox | null>(null);
 
   useEffect(() => {
     // Only register in secure contexts (HTTPS or localhost)
@@ -17,92 +15,62 @@ export default function ServiceWorkerRegistration() {
                           window.location.hostname === 'localhost';
     
     if ('serviceWorker' in navigator && (isSecureContext || process.env.NODE_ENV === 'development')) {
-      registerServiceWorker();
-    } else {
-      logger.warn('Service Worker not supported or not in secure context');
+      registerServiceWorkerWithWorkbox();
     }
     
-    // Listen for controlling service worker changes
-    navigator.serviceWorker?.addEventListener('controllerchange', () => {
-      logger.info('Service Worker controller changed - page will reload');
-      window.location.reload();
-    });
-    
-    // Listen for custom messages from service worker
-    navigator.serviceWorker?.addEventListener('message', (event) => {
-      logger.debug('Received message from Service Worker', {}, event.data);
-      
-      if (event.data.type === 'CACHE_UPDATED') {
-        setUpdateAvailable(true);
-      } else if (event.data.type === 'OFFLINE_READY') {
-        setOfflineReady(true);
-        // Auto-hide the offline ready notification after 5 seconds
-        setTimeout(() => setOfflineReady(false), 5000);
-      }
-    });
-    
     return () => {
-      // Clean up event listeners if needed
+      // Clean up handled by Workbox
     };
   }, []);
   
-  const registerServiceWorker = async () => {
+  const registerServiceWorkerWithWorkbox = async () => {
     try {
-      logger.info('Registering service worker');
-      // Cache-bust SW URL to ensure clients fetch latest on domain changes
-      const reg = await navigator.serviceWorker.register(`/sw.js?v=${Date.now()}`, {
+      // Initialize Workbox
+      const wb = new Workbox('/sw.js', {
         scope: '/',
-        // Update service worker when page loads
-        updateViaCache: 'none'
+        updateViaCache: 'none',
       });
       
-      setRegistration(reg);
-      logger.info('Service Worker registered successfully', {}, { scope: reg.scope });
+      setWorkbox(wb);
       
-      // Check if there's an update available
-      if (reg.waiting) {
-        logger.info('New service worker waiting');
+      // Listen for waiting service worker
+      wb.addEventListener('waiting', () => {
         setUpdateAvailable(true);
-      }
-      
-      // Handle updates to the service worker
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        
-        if (!newWorker) return;
-        
-        logger.info('New service worker installing');
-        
-        newWorker.addEventListener('statechange', () => {
-          logger.info(`Service worker state changed: ${newWorker.state}`);
-          
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            logger.info('New service worker installed and waiting');
-            setUpdateAvailable(true);
-          }
-        });
       });
+      
+      // Listen for controlling service worker change
+      wb.addEventListener('controlling', () => {
+        window.location.reload();
+      });
+      
+      // Listen for successful activation
+      wb.addEventListener('activated', (event: any) => {
+        if (!event.isUpdate) {
+          setOfflineReady(true);
+          setTimeout(() => setOfflineReady(false), 5000);
+        }
+      });
+      
+      // Register the service worker
+      const reg = await wb.register();
+      setRegistration(reg || null);
+      
+      // Check for updates every 60 seconds
+      setInterval(() => {
+        wb.update();
+      }, 60 * 1000);
       
     } catch (error) {
-      logger.error('Service Worker registration failed', {}, { error });
+      console.error('[SW] Registration failed:', error);
     }
   };
   
   const updateServiceWorker = () => {
-    if (!registration) return;
+    if (!workbox) return;
     
-    logger.info('Updating service worker');
-    
-    if (registration.waiting) {
-      // Send a message to the waiting service worker to skip waiting
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      setUpdateAvailable(false);
-    } else {
-      // Force an update check
-      registration.update().catch(error => {
-        logger.error('Service worker update failed', {}, { error });
-      });
-    }
+    // Tell the waiting service worker to activate
+    workbox.messageSkipWaiting();
+    setUpdateAvailable(false);
   };
   
   if (!updateAvailable && !offlineReady) {

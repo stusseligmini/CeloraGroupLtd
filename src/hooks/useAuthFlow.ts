@@ -1,122 +1,120 @@
 /**
- * Authentication middleware for handling post-login flow
- * Determines where to redirect users after successful authentication
+ * Authentication Flow Hooks
+ * 
+ * Provides convenient hooks for auth state, token management, and user info.
+ * Powered by Azure AD B2C (MSAL).
  */
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { getBrowserClient } from '../lib/supabase-browser';
+import { useMemo, useEffect, useCallback } from 'react';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { isTokenExpired, getTimeUntilExpiry, extractUserInfo } from '@/lib/jwtUtils';
 
 interface AuthState {
   user: any | null;
-  needsSeedPhrase: boolean;
   loading: boolean;
-  isNewUser: boolean;
+  isAuthenticated: boolean;
+  error: Error | null;
 }
 
+interface TokenInfo {
+  isExpired: boolean;
+  timeUntilExpiry: number | null;
+  shouldRefresh: boolean;
+  userInfo: ReturnType<typeof extractUserInfo>;
+}
+
+/**
+ * Main auth hook with comprehensive state
+ */
 export function useAuthFlow(): AuthState {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    needsSeedPhrase: false,
-    loading: true,
-    isNewUser: false
-  });
+  const { user, loading, error } = useAuthContext();
 
-  const router = useRouter();
-
-  useEffect(() => {
-    const handleAuthFlow = async () => {
-      try {
-        // Debug environment variables
-        console.log('🔍 Environment check:', {
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-          hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        });
-
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          console.error('❌ Missing environment variables');
-          setAuthState({ user: null, needsSeedPhrase: false, loading: false, isNewUser: false });
-          return;
-        }
-        let supabase;
-        try {
-          supabase = getBrowserClient();
-        } catch (e) {
-          console.error('Failed to init Supabase client in useAuthFlow:', e);
-          setAuthState({ user: null, needsSeedPhrase: false, loading: false, isNewUser: false });
-          return;
-        }
-
-        // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError || !user) {
-          setAuthState({ user: null, needsSeedPhrase: false, loading: false, isNewUser: false });
-          return;
-        }
-
-        // Get user profile
-        const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('has_seed_phrase, created_at, wallet_type')
-          .eq('id', user.id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching user profile:', profileError);
-          setAuthState({ user, needsSeedPhrase: false, loading: false, isNewUser: false });
-          return;
-        }
-
-        // Check if user is new (created within last 10 minutes)
-        const createdAt = new Date(profile.created_at);
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-        const isNewUser = createdAt > tenMinutesAgo;
-
-        // Only suggest seed phrase for:
-        // 1. New email users (not seed phrase users)
-        // 2. Users who don't already have seed phrase backup
-        const isEmailUser = profile.wallet_type !== 'seed_phrase';
-        const needsSeedPhrase = isNewUser && isEmailUser && !profile.has_seed_phrase;
-
-        setAuthState({
-          user,
-          needsSeedPhrase,
-          loading: false,
-          isNewUser
-        });
-
-      } catch (err) {
-        console.error('Auth flow error:', err);
-        setAuthState({ user: null, needsSeedPhrase: false, loading: false, isNewUser: false });
-      }
-    };
-
-    handleAuthFlow();
-
-    // Listen for auth changes
-    let supabase;
-    try {
-      supabase = getBrowserClient();
-    } catch {
-      return; // no listener if client missing
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-      if (event === 'SIGNED_IN' && session) {
-        // Refresh auth flow on sign in
-        handleAuthFlow();
-      } else if (event === 'SIGNED_OUT') {
-        setAuthState({ user: null, needsSeedPhrase: false, loading: false, isNewUser: false });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  return authState;
+  return useMemo<AuthState>(
+    () => ({
+      user,
+      loading,
+      isAuthenticated: !!user,
+      error,
+    }),
+    [user, loading, error]
+  );
 }
 
-// Alias for compatibility
+/**
+ * Hook for token information and validation
+ */
+export function useTokenInfo(): TokenInfo | null {
+  const { session } = useAuthContext();
+  
+  return useMemo(() => {
+    if (!session?.accessToken) return null;
+    
+    const token = session.accessToken;
+    const timeUntilExpiry = getTimeUntilExpiry(token);
+    
+    return {
+      isExpired: isTokenExpired(token, 0),
+      timeUntilExpiry,
+      shouldRefresh: isTokenExpired(token, 300), // 5 min buffer
+      userInfo: extractUserInfo(token),
+    };
+  }, [session]);
+}
+
+/**
+ * Hook for automatic token refresh on mount/focus
+ */
+export function useAutoRefresh(enabled = true): void {
+  const { refreshSession } = useAuthContext();
+  const tokenInfo = useTokenInfo();
+  
+  const handleRefresh = useCallback(async () => {
+    if (!enabled || !tokenInfo) return;
+    
+    if (tokenInfo.shouldRefresh && !tokenInfo.isExpired) {
+      try {
+        await refreshSession();
+      } catch (error) {
+        console.error('[Auth] Auto-refresh failed:', error);
+      }
+    }
+  }, [enabled, tokenInfo, refreshSession]);
+  
+  // Refresh on mount if needed
+  useEffect(() => {
+    handleRefresh();
+  }, [handleRefresh]);
+  
+  // Refresh on window focus
+  useEffect(() => {
+    if (!enabled) return;
+    
+    const handleFocus = () => {
+      handleRefresh();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [enabled, handleRefresh]);
+}
+
+/**
+ * Hook to require authentication (redirects if not authenticated)
+ */
+export function useRequireAuth(): AuthState {
+  const auth = useAuthFlow();
+  const { signIn } = useAuthContext();
+  
+  useEffect(() => {
+    if (!auth.loading && !auth.isAuthenticated) {
+      console.warn('[Auth] User not authenticated, triggering sign-in');
+      signIn();
+    }
+  }, [auth.loading, auth.isAuthenticated, signIn]);
+  
+  return auth;
+}
+
+// Alias for backward compatibility
 export const useAuth = useAuthFlow;

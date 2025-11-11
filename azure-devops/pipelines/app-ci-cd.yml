@@ -1,0 +1,135 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pr: none
+
+variables:
+  - group: celora-shared
+  - name: NODE_VERSION
+    value: '20.x'
+  - name: IMAGE_NAME
+    value: 'celora-web'
+  - name: DEPLOY_ENV
+    value: 'prod'
+
+stages:
+  - stage: Build
+    displayName: "Build & Package"
+    jobs:
+      - job: build_and_package
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+            displayName: 'Use Node.js $(NODE_VERSION)'
+
+          - task: Cache@2
+            inputs:
+              key: 'npm | $(Agent.OS) | package-lock.json'
+              restoreKeys: 'npm | $(Agent.OS)'
+              path: '$(Pipeline.Workspace)/.npm'
+            displayName: 'Cache npm'
+
+          - script: npm ci
+            displayName: 'Install dependencies'
+
+          - script: npm run lint
+            displayName: 'Run ESLint'
+            continueOnError: false
+
+          - script: npm run typecheck
+            displayName: 'Run TypeScript checks'
+            continueOnError: false
+
+          - script: npm test -- --coverage --ci --maxWorkers=2
+            displayName: 'Run Jest tests with coverage'
+            continueOnError: false
+
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/junit.xml'
+              failTaskOnFailedTests: true
+            displayName: 'Publish test results'
+
+          - task: PublishCodeCoverageResults@1
+            condition: succeededOrFailed()
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/coverage'
+            displayName: 'Publish code coverage'
+
+          - script: |
+              COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+              echo "Code coverage: $COVERAGE%"
+              if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+                echo "##vso[task.logissue type=error]Code coverage ($COVERAGE%) is below 70% threshold"
+                exit 1
+              fi
+            displayName: 'Enforce coverage threshold (70%)'
+            continueOnError: false
+
+          - script: npm run build
+            displayName: 'Build Next.js app + Service Worker'
+            continueOnError: false
+
+          - script: npm run build:extension
+            displayName: 'Build browser extension'
+
+          - script: |
+              set -euo pipefail
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              tar -czf $(Build.ArtifactStagingDirectory)/celora-pwa.tgz .next package.json package-lock.json
+            displayName: 'Bundle PWA build artifact'
+
+          - script: |
+              set -euo pipefail
+              if [ -d extension ]; then
+                cd extension
+                zip -r ../$(Build.ArtifactStagingDirectory)/celora-extension.zip manifest.json popup.html popup.css dist
+              fi
+            displayName: 'Zip browser extension'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'celora-artifacts'
+            displayName: 'Publish build artifacts'
+
+  - stage: Deploy
+    displayName: "Deploy to Azure"
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: deploy_to_azure
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: celora-artifacts
+                  displayName: 'Download build artifacts'
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    appType: 'webAppLinux'
+                    appName: '$(AZURE_WEBAPP_NAME)'
+                    package: '$(Pipeline.Workspace)/celora-artifacts/celora-pwa.tgz'
+                    runtimeStack: 'NODE|20-lts'
+                    startUpCommand: 'npm start'
+                  displayName: 'Deploy to Azure Web App'
+
+                - script: |
+                    echo "Deployment completed successfully"
+                    echo "App URL: https://$(AZURE_WEBAPP_NAME).azurewebsites.net"
+                  displayName: 'Deployment summary'

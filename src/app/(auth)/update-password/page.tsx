@@ -1,59 +1,77 @@
 "use client";
-import { useEffect, useState } from 'react';
-import { getSupabaseClient } from '@/lib/supabaseSingleton';
-import type { Session } from '@supabase/supabase-js';
+
+import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function UpdatePasswordPage() {
-  const router = useRouter();
-  const supabase = getSupabaseClient();
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { triggerPasswordReset, isLoading } = useAuth();
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Ensure user is in password recovery session
-    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
-      if(!data.session) {
-        setError('No active recovery session');
-      }
-    });
-  }, [supabase]);
+  const handlePasswordReset = async () => {
+    setStatus(null);
+    setError(null);
+    const result = await triggerPasswordReset();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(password !== confirm) { setError('Passwords do not match'); return; }
-    setLoading(true); setError(null); setMessage(null);
-    const { error } = await supabase.auth.updateUser({ password });
-    if(error) setError(error.message); else { setMessage('Password updated'); setTimeout(()=>router.push('/signin'), 2000); }
-    setLoading(false);
+    if (!result.success && result.error) {
+      setError(result.error);
+      return;
+    }
+
+    setStatus(
+      'A secure Azure AD B2C password reset flow has been started. Complete the steps in the new window to finish updating your password.',
+    );
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
-      <div className="w-full max-w-md space-y-6 bg-white p-8 rounded shadow">
-        <h1 className="text-2xl font-bold text-gray-900">Set new password</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">New password</label>
-            <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Confirm password</label>
-            <input type="password" required value={confirm} onChange={e=>setConfirm(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {message && <p className="text-sm text-green-600">{message}</p>}
-          <button disabled={loading} className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 disabled:opacity-50">{loading ? 'Updating...' : 'Update password'}</button>
-        </form>
-        <div className="flex justify-between text-sm">
-          <Link href="/signin" className="text-indigo-600 hover:underline">Sign in</Link>
-          <Link href="/signup" className="text-indigo-600 hover:underline">Create account</Link>
+    <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-gray-950 to-blue-950 opacity-80" />
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-2xl bg-gray-900/70 backdrop-blur-xl border border-cyan-400/25 rounded-2xl px-10 py-12 space-y-8 shadow-[0_25px_80px_-25px_rgba(0,220,255,0.35)]"
+      >
+        <div className="space-y-2">
+          <p className="uppercase tracking-[0.3em] text-xs text-cyan-300/80">Celora Identity</p>
+          <h1 className="text-3xl font-mono font-bold text-cyan-200">Update Your Password</h1>
+          <p className="text-sm text-gray-300 leading-relaxed">
+            Celora bruker Azure AD B2C for passordadministrasjon. Klikk på knappen under for å starte den
+            sikre B2C-reset flyten. Du blir sendt til Microsoft sitt passordskjema og returnerer hit når
+            prosessen er fullført.
+          </p>
         </div>
-      </div>
+
+        {error && (
+          <div className="rounded-md border border-red-500/40 bg-red-500/15 p-4 text-sm text-red-200">
+            {error}
+          </div>
+        )}
+
+        {status && (
+          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+            {status}
+          </div>
+        )}
+
+        <button
+          onClick={handlePasswordReset}
+          disabled={isLoading}
+          className="w-full bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:via-sky-400 hover:to-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-mono font-semibold py-3 rounded-md transition-all"
+        >
+          {isLoading ? 'Redirecting…' : 'Start Azure Password Reset'}
+        </button>
+
+        <div className="text-sm text-gray-400 flex items-center justify-between">
+          <Link href="/signin" className="text-cyan-300 hover:text-cyan-200 font-medium">
+            Tilbake til innlogging
+          </Link>
+          <Link href="/signup" className="text-cyan-300 hover:text-cyan-200 font-medium">
+            Opprett konto
+          </Link>
+        </div>
+      </motion.div>
     </div>
   );
 }

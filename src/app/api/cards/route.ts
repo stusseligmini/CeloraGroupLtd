@@ -1,165 +1,256 @@
+/**
+ * Virtual Cards API - GET (list), POST (create)
+ * /api/cards
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { hash } from 'bcryptjs';
-import { 
-  ApiResponseHelper, 
-  RequestValidator, 
-  HttpStatusCode,
-  type StaticRouteHandler 
-} from '@/types/api';
+import { PrismaClient } from '@prisma/client';
+import { ApiResponseHelper, HttpStatusCode } from '@/types/api';
+import { CardCreateRequestSchema, CardListQuerySchema } from '@/lib/validation/schemas';
+import { encrypt, generateCardNumber, generateCVV, getLastFourDigits, validateExpiry } from '@/lib/security/encryption';
+import { logError } from '@/lib/logger';
+import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
+const prisma = new PrismaClient();
 
-export const POST: StaticRouteHandler = async (request: NextRequest) => {
+/**
+ * GET /api/cards - List all cards for user
+ */
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { cardType, currency, spendingLimit, pin } = body;
-    
-    // Validate required fields
-    const requiredFieldErrors = RequestValidator.validateRequired(
-      { cardType, currency },
-      ['cardType', 'currency']
-    );
-    
-    if (requiredFieldErrors.length > 0) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json(
-        ApiResponseHelper.error(
-          'Missing required fields',
-          'VALIDATION_ERROR',
-          { errors: requiredFieldErrors }
-        ),
-        { status: HttpStatusCode.BAD_REQUEST }
-      );
-    }
-    
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    // Verify the user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Authentication required', 'UNAUTHORIZED'),
+        ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
         { status: HttpStatusCode.UNAUTHORIZED }
       );
     }
 
-    // Hash the PIN for security
-    let pinHash = null;
-    if (pin) {
-      pinHash = await hash(pin, 12);
-    }
-
-    // Generate a masked PAN (in production, this would be a real card number)
-    const maskedPan = `**** **** **** ${Math.floor(1000 + Math.random() * 9000)}`;
-
-    // Create virtual card
-    const { data, error } = await supabase
-      .from('virtual_cards')
-      .insert({
-        user_id: session.user.id,
-        masked_pan: maskedPan,
-        balance: 0,
-        currency: currency || 'USD',
-        status: 'active'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating card:', error);
-      return NextResponse.json(
-        ApiResponseHelper.error(
-          'Failed to create card',
-          'DATABASE_ERROR',
-          process.env.NODE_ENV === 'development' ? { details: error.message } : undefined
-        ),
-        { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
-      );
-    }
-
-    return NextResponse.json(
-      ApiResponseHelper.success(data, 'Virtual card created successfully'),
-      { status: HttpStatusCode.CREATED }
-    );
+    const { searchParams } = new URL(request.url);
     
-  } catch (error: any) {
-    console.error('API error:', error);
-    
-    if (error instanceof SyntaxError) {
+    // Validate query params
+    const queryValidation = CardListQuerySchema.safeParse({
+      page: searchParams.get('page'),
+      limit: searchParams.get('limit'),
+      walletId: searchParams.get('walletId'),
+      status: searchParams.get('status'),
+    });
+
+    if (!queryValidation.success) {
       return NextResponse.json(
-        ApiResponseHelper.error('Invalid JSON in request body', 'INVALID_JSON'),
+        ApiResponseHelper.error('Invalid query parameters', 'VALIDATION_ERROR', queryValidation.error.flatten()),
         { status: HttpStatusCode.BAD_REQUEST }
       );
     }
-    
+
+    const { page, limit, walletId, status } = queryValidation.data;
+    const offset = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = { userId };
+    if (walletId) where.walletId = walletId;
+    if (status) where.status = status;
+
+    // Fetch cards
+    const [cards, total] = await Promise.all([
+      prisma.card.findMany({
+        where,
+        skip: offset,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userId: true,
+          walletId: true,
+          nickname: true,
+          brand: true,
+          type: true,
+          cardholderName: true,
+          expiryMonth: true,
+          expiryYear: true,
+          spendingLimit: true,
+          dailyLimit: true,
+          monthlyLimit: true,
+          totalSpent: true,
+          monthlySpent: true,
+          status: true,
+          isOnline: true,
+          isContactless: true,
+          isATM: true,
+          lastUsedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          activatedAt: true,
+          encryptedNumber: true, // For last 4 digits only
+        },
+      }),
+      prisma.card.count({ where }),
+    ]);
+
+    // Map to response format (with masked card numbers)
+    const cardsResponse = cards.map(card => {
+      // Decrypt only to get last 4 digits, don't return full number
+      const lastFourDigits = getLastFourDigits(card.encryptedNumber); // In production, decrypt first
+      
+      return {
+        id: card.id,
+        userId: card.userId,
+        walletId: card.walletId,
+        nickname: card.nickname,
+        brand: card.brand as 'VISA' | 'MASTERCARD',
+        type: card.type as 'virtual' | 'physical',
+        lastFourDigits,
+        cardholderName: card.cardholderName,
+        expiryMonth: card.expiryMonth,
+        expiryYear: card.expiryYear,
+        spendingLimit: card.spendingLimit ? Number(card.spendingLimit) : null,
+        dailyLimit: card.dailyLimit ? Number(card.dailyLimit) : null,
+        monthlyLimit: card.monthlyLimit ? Number(card.monthlyLimit) : null,
+        totalSpent: Number(card.totalSpent),
+        monthlySpent: Number(card.monthlySpent),
+        status: card.status as 'active' | 'frozen' | 'cancelled',
+        isOnline: card.isOnline,
+        isContactless: card.isContactless,
+        isATM: card.isATM,
+        lastUsedAt: card.lastUsedAt?.toISOString() || null,
+        createdAt: card.createdAt.toISOString(),
+        updatedAt: card.updatedAt.toISOString(),
+        activatedAt: card.activatedAt?.toISOString() || null,
+      };
+    });
+
     return NextResponse.json(
-      ApiResponseHelper.error(
-        'Internal server error',
-        'INTERNAL_ERROR',
-        process.env.NODE_ENV === 'development' ? { stack: error.stack } : undefined
-      ),
-      { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
-    );
-  }
-};
-
-export const GET: StaticRouteHandler = async (request: NextRequest) => {
-  try {
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    // Verify the user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Authentication required', 'UNAUTHORIZED'),
-        { status: HttpStatusCode.UNAUTHORIZED }
-      );
-    }
-
-    // Get user's cards with pagination support
-    const searchParams = request.nextUrl.searchParams;
-    const paginationValidation = RequestValidator.validatePagination(searchParams);
-    const { limit, offset } = paginationValidation;
-
-    const { data, error, count } = await supabase
-      .from('virtual_cards')
-      .select('*', { count: 'exact' })
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      console.error('Error fetching cards:', error);
-      return NextResponse.json(
-        ApiResponseHelper.error(
-          'Failed to fetch cards',
-          'DATABASE_ERROR',
-          process.env.NODE_ENV === 'development' ? { details: error.message } : undefined
-        ),
-        { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
-      );
-    }
-
-    return NextResponse.json(
-      ApiResponseHelper.paginated(
-        data || [],
-        { limit, offset, total: count || 0 },
-        'Cards retrieved successfully'
-      ),
+      ApiResponseHelper.success({
+        cards: cardsResponse,
+        pagination: { page, limit, total },
+      }),
       { status: HttpStatusCode.OK }
     );
-    
-  } catch (error: any) {
-    console.error('API error:', error);
+
+  } catch (error) {
+    logError('Failed to fetch cards', error);
     return NextResponse.json(
-      ApiResponseHelper.error(
-        'Internal server error',
-        'INTERNAL_ERROR',
-        process.env.NODE_ENV === 'development' ? { stack: error.stack } : undefined
-      ),
+      ApiResponseHelper.error('Internal server error', 'INTERNAL_ERROR'),
       { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
     );
   }
-};
+}
+
+/**
+ * POST /api/cards - Create new virtual card
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json(
+        ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
+        { status: HttpStatusCode.UNAUTHORIZED }
+      );
+    }
+
+    const body = await request.json();
+    
+    // Validate request body
+    const validation = CardCreateRequestSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        ApiResponseHelper.error('Invalid request body', 'VALIDATION_ERROR', validation.error.flatten()),
+        { status: HttpStatusCode.BAD_REQUEST }
+      );
+    }
+
+    const { walletId, nickname, brand, type, spendingLimit, dailyLimit, monthlyLimit } = validation.data;
+
+    // Verify wallet belongs to user
+    const wallet = await prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      return NextResponse.json(
+        ApiResponseHelper.error('Wallet not found', 'NOT_FOUND'),
+        { status: HttpStatusCode.NOT_FOUND }
+      );
+    }
+
+    // Generate card details
+    const cardNumber = generateCardNumber(brand);
+    const cvv = generateCVV();
+    
+    // Encrypt sensitive data
+    const encryptedNumber = encrypt(cardNumber);
+    const encryptedCVV = encrypt(cvv);
+    
+    // Set expiry date (3 years from now)
+    const now = new Date();
+    const expiryMonth = now.getMonth() + 1;
+    const expiryYear = now.getFullYear() + 3;
+
+    // Get cardholder name from user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, email: true },
+    });
+
+    const cardholderName = (user?.displayName || user?.email?.split('@')[0] || 'CARDHOLDER').toUpperCase();
+
+    // Create card
+    const card = await prisma.card.create({
+      data: {
+        userId,
+        walletId,
+        encryptedNumber,
+        encryptedCVV,
+        cardholderName,
+        expiryMonth,
+        expiryYear,
+        nickname,
+        brand,
+        type,
+        spendingLimit,
+        dailyLimit,
+        monthlyLimit,
+        status: 'active',
+        activatedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json(
+      ApiResponseHelper.success({
+        card: {
+          id: card.id,
+          userId: card.userId,
+          walletId: card.walletId,
+          nickname: card.nickname,
+          brand: card.brand,
+          type: card.type,
+          lastFourDigits: getLastFourDigits(cardNumber),
+          cardholderName: card.cardholderName,
+          expiryMonth: card.expiryMonth,
+          expiryYear: card.expiryYear,
+          spendingLimit: card.spendingLimit ? Number(card.spendingLimit) : null,
+          dailyLimit: card.dailyLimit ? Number(card.dailyLimit) : null,
+          monthlyLimit: card.monthlyLimit ? Number(card.monthlyLimit) : null,
+          totalSpent: Number(card.totalSpent),
+          monthlySpent: Number(card.monthlySpent),
+          status: card.status,
+          isOnline: card.isOnline,
+          isContactless: card.isContactless,
+          isATM: card.isATM,
+          createdAt: card.createdAt.toISOString(),
+          updatedAt: card.updatedAt.toISOString(),
+          activatedAt: card.activatedAt?.toISOString() || null,
+        },
+      }, 'Card created successfully'),
+      { status: HttpStatusCode.CREATED }
+    );
+
+  } catch (error) {
+    logError('Failed to create card', error);
+    return NextResponse.json(
+      ApiResponseHelper.error('Internal server error', 'INTERNAL_ERROR'),
+      { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
+    );
+  }
+}

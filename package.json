@@ -112,7 +112,7 @@
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
     "autoprefixer": "^10.4.19",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.27.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
     "eslint-config-prettier": "^10.1.8",
@@ -128,6 +128,12 @@
     "typescript": "^5.4.0",
     "workbox-cli": "^7.3.0",
     "workbox-webpack-plugin": "^7.3.0"
+  },
+  "overrides": {
+    "elliptic": "^6.6.1",
+    "bigint-buffer": "^1.1.5",
+    "undici": "^6.22.0",
+    "tmp": "^0.2.4"
   },
   "engines": {
     "node": ">=20.0.0",

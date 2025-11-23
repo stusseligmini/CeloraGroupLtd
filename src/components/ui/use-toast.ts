@@ -1,5 +1,6 @@
 // Basic toast notification hook
 import { useState, useCallback } from 'react';
+import { logger } from '@/lib/logger';
 
 interface Toast {
   id: string;
@@ -45,12 +46,18 @@ export function useToast() {
     description?: string;
     variant?: 'default' | 'success' | 'error' | 'warning';
   }) => {
-    // For now, just use console.log - can be enhanced with actual toast UI later
-    const prefix = options.variant === 'error' ? '❌' : 
-                   options.variant === 'success' ? '✅' : 
-                   options.variant === 'warning' ? '⚠️' : 'ℹ️';
+    // For now, log to structured logger - can be enhanced with actual toast UI later
+    const logLevel = options.variant === 'error' ? 'error' : 
+                     options.variant === 'warning' ? 'warn' : 
+                     'info';
     
-    console.log(`${prefix} ${options.title}${options.description ? `: ${options.description}` : ''}`);
+    if (logLevel === 'error') {
+      logger.error(options.title, undefined, { description: options.description });
+    } else if (logLevel === 'warn') {
+      logger.warn(options.title, { description: options.description });
+    } else {
+      logger.info(options.title, { description: options.description });
+    }
     
     // Return toast object for consistency
     return {

@@ -1,10 +1,14 @@
 /**
- * Rate Limiting with Redis Support
+ * Rate Limiting with In-Memory Store
  * 
- * Implements sliding window rate limiting with Redis for distributed systems.
- * Falls back to in-memory store for development.
+ * Implements sliding window rate limiting using in-memory store.
+ * For production with multiple instances, consider using a reverse proxy
+ * like Azure Front Door or Cloudflare for distributed rate limiting.
+ * 
+ * @server-only This file must only be imported in server-side code (API routes, server components)
  */
 
+import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 
 // In-memory store for development (not suitable for production with multiple instances)
@@ -87,68 +91,6 @@ async function rateLimitInMemory(
 }
 
 /**
- * Rate limiter using Redis (for production)
- * Implements sliding window algorithm using Redis sorted sets
- */
-async function rateLimitRedis(
-  key: string,
-  limit: number,
-  windowMs: number
-): Promise<RateLimitResult> {
-  try {
-    // Lazy import Redis to avoid bundling in client
-    const { createClient } = await import('redis');
-    
-    const redisUrl = process.env.REDIS_URL || process.env.AZURE_REDIS_CONNECTION_STRING;
-    if (!redisUrl) {
-      console.warn('Redis URL not configured, falling back to in-memory rate limiting');
-      return rateLimitInMemory(key, limit, windowMs);
-    }
-    
-    const client = createClient({ url: redisUrl });
-    await client.connect();
-    
-    try {
-      const now = Date.now();
-      const windowStart = now - windowMs;
-      const resetTime = now + windowMs;
-      
-      // Use Redis sorted set for sliding window
-      // 1. Remove old entries outside the window
-      await client.zRemRangeByScore(key, 0, windowStart);
-      
-      // 2. Count entries in current window
-      const count = await client.zCard(key);
-      
-      // 3. Check if under limit
-      const success = count < limit;
-      const remaining = Math.max(0, limit - count - 1);
-      
-      // 4. Add new entry if under limit
-      if (success) {
-        await client.zAdd(key, { score: now, value: `${now}-${Math.random()}` });
-        // Set expiry on the key to auto-cleanup
-        await client.expire(key, Math.ceil(windowMs / 1000));
-      }
-      
-      await client.disconnect();
-      
-      return {
-        success,
-        limit,
-        remaining,
-        resetTime,
-      };
-    } finally {
-      await client.quit();
-    }
-  } catch (error) {
-    console.error('Redis rate limiting error, falling back to in-memory:', error);
-    return rateLimitInMemory(key, limit, windowMs);
-  }
-}
-
-/**
  * Apply rate limiting
  */
 export async function rateLimit(
@@ -164,8 +106,10 @@ export async function rateLimit(
   const key = keyGenerator(request);
   const storeKey = `ratelimit:${key}`;
   
-  // Always use in-memory for now (Redis causes bundling issues in middleware)
-  // In production, consider using edge-compatible KV store like Vercel KV or Upstash
+  // Use in-memory rate limiting
+  // NOTE: For production with multiple instances, implement distributed rate limiting
+  // at the infrastructure level (Azure Front Door, Cloudflare, etc.) or use
+  // an edge-compatible KV store like Upstash Redis with REST API
   return rateLimitInMemory(storeKey, limit, windowMs);
 }
 

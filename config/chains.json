@@ -1,0 +1,66 @@
+{
+  "ethereum": {
+    "chainId": 1,
+    "name": "Ethereum",
+    "symbol": "ETH",
+    "decimals": 18,
+    "rpcUrl": "https://eth.llamarpc.com",
+    "explorerUrl": "https://etherscan.io",
+    "type": "evm"
+  },
+  "polygon": {
+    "chainId": 137,
+    "name": "Polygon",
+    "symbol": "MATIC",
+    "decimals": 18,
+    "rpcUrl": "https://polygon-rpc.com",
+    "explorerUrl": "https://polygonscan.com",
+    "type": "evm"
+  },
+  "arbitrum": {
+    "chainId": 42161,
+    "name": "Arbitrum One",
+    "symbol": "ETH",
+    "decimals": 18,
+    "rpcUrl": "https://arb1.arbitrum.io/rpc",
+    "explorerUrl": "https://arbiscan.io",
+    "type": "evm"
+  },
+  "optimism": {
+    "chainId": 10,
+    "name": "Optimism",
+    "symbol": "ETH",
+    "decimals": 18,
+    "rpcUrl": "https://mainnet.optimism.io",
+    "explorerUrl": "https://optimistic.etherscan.io",
+    "type": "evm"
+  },
+  "celo": {
+    "chainId": 42220,
+    "name": "Celo",
+    "symbol": "CELO",
+    "decimals": 18,
+    "rpcUrl": "https://forno.celo.org",
+    "explorerUrl": "https://explorer.celo.org",
+    "type": "evm"
+  },
+  "solana": {
+    "chainId": "mainnet-beta",
+    "name": "Solana",
+    "symbol": "SOL",
+    "decimals": 9,
+    "rpcUrl": "https://api.mainnet-beta.solana.com",
+    "explorerUrl": "https://explorer.solana.com",
+    "type": "solana"
+  },
+  "bitcoin": {
+    "chainId": "mainnet",
+    "name": "Bitcoin",
+    "symbol": "BTC",
+    "decimals": 8,
+    "rpcUrl": "https://blockstream.info/api",
+    "explorerUrl": "https://blockstream.info",
+    "type": "bitcoin"
+  }
+}
+

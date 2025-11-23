@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getWalletSummary } from '@/server/services/walletService';
 import { WalletSummaryResponseSchema } from '@/lib/validation/schemas';
 import { errorResponse, successResponse } from '@/lib/validation/validate';
+import { logger } from '@/lib/logger';
 
 const allowedOrigins = new Set(
   [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_EXTENSION_ORIGIN]
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     const response = successResponse(validatedSummary, 200, requestId);
     return withCors(response, request);
   } catch (error) {
-    console.error('[Wallet Summary Error]', error);
+    logger.error('Wallet summary error', error as Error);
     const response = errorResponse(
       'INTERNAL_SERVER_ERROR',
       'Failed to fetch wallet summary',

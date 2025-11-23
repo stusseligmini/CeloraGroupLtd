@@ -1,4 +1,5 @@
 import { ClientSecretCredential } from '@azure/identity';
+import { logger } from '@/lib/logger';
 
 type CallOptions = {
   path: string;
@@ -66,16 +67,79 @@ async function getClientCredentialToken(): Promise<string | null> {
     };
     return result.token;
   } catch (error) {
-    console.warn('[platformApi] failed to acquire client credential token', error);
+    logger.warn('Failed to acquire client credential token', { error });
     return null;
   }
 }
 
+/**
+ * Generate idempotency key for POST/PUT/PATCH requests
+ */
+function generateIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
+/**
+ * Retry fetch with exponential backoff
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  retryDelay = 1000
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // Don't retry on 4xx errors (client errors)
+      if (response.status >= 400 && response.status < 500) {
+        return response;
+      }
+
+      // Retry on 5xx errors and network errors
+      if (response.ok || attempt === maxRetries - 1) {
+        return response;
+      }
+
+      // Wait before retrying (exponential backoff with jitter)
+      const delay = retryDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    } catch (error) {
+      lastError = error as Error;
+
+      // Don't retry on abort errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+
+      // Wait before retrying
+      if (attempt < maxRetries - 1) {
+        const delay = retryDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch after retries');
+}
+
 export async function callPlatformApi<T>(
-  options: CallOptions,
+  options: CallOptions & { idempotencyKey?: string; maxRetries?: number },
   fallback?: () => Promise<T> | T
 ): Promise<T> {
-  const { path, method = 'GET', body, headers = {}, userToken, timeoutMs = 5000 } = options;
+  const {
+    path,
+    method = 'GET',
+    body,
+    headers = {},
+    userToken,
+    timeoutMs = 10000, // Increased default timeout
+    idempotencyKey,
+    maxRetries = 3,
+  } = options;
 
   if (!baseUrl) {
     if (fallback) {
@@ -99,6 +163,12 @@ export async function callPlatformApi<T>(
     requestHeaders.Authorization = `Bearer ${bearerToken}`;
   }
 
+  // Add idempotency key for mutating requests
+  if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    const key = idempotencyKey || generateIdempotencyKey();
+    requestHeaders['Idempotency-Key'] = key;
+  }
+
   if (body !== undefined && body !== null && method !== 'GET') {
     requestHeaders['Content-Type'] = 'application/json';
   }
@@ -107,12 +177,16 @@ export async function callPlatformApi<T>(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method,
-      headers: requestHeaders,
-      body: body && method !== 'GET' ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
+    const response = await fetchWithRetry(
+      `${baseUrl}${path}`,
+      {
+        method,
+        headers: requestHeaders,
+        body: body && method !== 'GET' ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      },
+      maxRetries
+    );
 
     clearTimeout(timeoutId);
 
@@ -133,8 +207,19 @@ export async function callPlatformApi<T>(
     return (await response.text()) as unknown as T;
   } catch (error) {
     clearTimeout(timeoutId);
+    
+    // Log retry attempts
+    if (error instanceof Error && error.name !== 'AbortError') {
+      logger.warn('Platform API request failed', {
+        path,
+        method,
+        error: error.message,
+        retries: maxRetries,
+      });
+    }
+
     if (fallback) {
-      console.warn('[platformApi] falling back to local handler for', path, error);
+      logger.warn('Falling back to local handler', { path, error });
       return await fallback();
     }
     throw error;

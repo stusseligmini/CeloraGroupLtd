@@ -1,31 +1,47 @@
-# Ignore problematic admin directories that cause Windows permission issues
-src/app/api/admin/**
+# Dependencies
+node_modules
+.pnp
+.pnp.js
 
-# Ignore development and build artifacts
-packages/
-secure/
-data/
-ops/
-config/
-apps/
-migration_source/
-benchmark/
-scripts/
-tests/
-security/
-legacy-import/
-database/
-# Only ignore the root-level Supabase folder used by the CLI, not our app code under src/lib/supabase
-/supabase/
-# Explicitly include Supabase client code in src
-!src/lib/supabase/**
-.turbo/
-turbo.json
-tsconfig.base.json
-*.log
-fix-api-files.js
-*DEMO.md
-*CHANGELOG.md
-*STATUS.md
-*READY.md
-*DEPLOYMENT*.md
+# Testing
+coverage
+.nyc_output
+
+# Production
+.vercel
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Azure specific (not needed for Vercel)
+azure-devops/
+infra/
+deploy/
+docs/azure-baseline.md
+
+# Mobile
+mobile/
+
+# Extension build artifacts
+extension/dist/
+extension/build/

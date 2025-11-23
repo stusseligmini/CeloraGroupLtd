@@ -14,6 +14,7 @@ import {
   successResponse,
 } from '@/lib/validation/validate';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const allowedOrigins = new Set(
   [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_EXTENSION_ORIGIN]
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
       return withCors(validationErrorResponse(error, requestId), request);
     }
 
-    console.error('[Notifications GET Error]', error);
+    logger.error('Notifications GET error', error, { requestId });
     const response = errorResponse(
       'INTERNAL_SERVER_ERROR',
       'Failed to fetch notifications',
@@ -128,6 +129,20 @@ export async function POST(request: NextRequest) {
       return withCors(response, request);
     }
 
+    // Get userId from JWT token
+    const { getUserIdFromRequest } = await import('@/lib/auth/serverAuth');
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      const response = errorResponse(
+        'UNAUTHORIZED',
+        'Invalid authentication token',
+        401,
+        undefined,
+        requestId
+      );
+      return withCors(response, request);
+    }
+
     // Mark notifications as read in database
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
@@ -136,7 +151,7 @@ export async function POST(request: NextRequest) {
       const result = await prisma.notification.updateMany({
         where: {
           id: { in: body.notificationIds },
-          // TODO: Add userId filter when we decode JWT to get userId
+          userId, // Ensure users can only mark their own notifications as read
         },
         data: {
           status: 'read',
@@ -166,7 +181,7 @@ export async function POST(request: NextRequest) {
       return withCors(validationErrorResponse(error, requestId), request);
     }
 
-    console.error('[Notifications POST Error]', error);
+    logger.error('Notifications POST error', error, { requestId });
     const response = errorResponse(
       'INTERNAL_SERVER_ERROR',
       'Failed to update notifications',

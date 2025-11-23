@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users can only access their own data
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      // Wallets subcollection
+      match /wallets/{walletId} {
+        allow read, write: if isOwner(userId);
+        // Prevent modifying userId and createdAt on updates
+        allow update: if isOwner(userId) 
+                      && request.resource.data.userId == resource.data.userId
+                      && request.resource.data.createdAt == resource.data.createdAt;
+      }
+      
+      // Transactions subcollection
+      match /transactions/{transactionId} {
+        allow read, write: if isOwner(userId);
+        allow update: if isOwner(userId)
+                      && request.resource.data.userId == resource.data.userId
+                      && request.resource.data.createdAt == resource.data.createdAt;
+      }
+      
+      // Settings subcollection
+      match /settings/{settingId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}

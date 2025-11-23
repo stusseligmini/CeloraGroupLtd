@@ -80,8 +80,9 @@ export function isTokenValid(expiresOn: Date | undefined | null): boolean {
 }
 
 /**
- * Acquire token silently with retry logic
+ * Acquire token silently with retry logic and improved error handling
  * Retries up to 3 times with exponential backoff
+ * Implements retry policy for transient failures
  */
 export async function acquireTokenSilentWithRetry(
   request: SilentRequest,
@@ -96,6 +97,11 @@ export async function acquireTokenSilentWithRetry(
       
       // Validate token
       if (!isTokenValid(result.expiresOn)) {
+        // If token is expiring soon, try to force refresh
+        if (attempt < maxRetries - 1) {
+          request.forceRefresh = true;
+          continue;
+        }
         throw new Error('Token expired or expiring soon');
       }
       
@@ -108,9 +114,16 @@ export async function acquireTokenSilentWithRetry(
         throw error;
       }
       
-      // Wait before retrying (exponential backoff)
+      // Don't retry on network errors after first attempt (likely persistent)
+      if (error instanceof Error && error.message.includes('network') && attempt > 0) {
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff with jitter)
       if (attempt < maxRetries - 1) {
-        const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+        const baseDelay = 1000 * Math.pow(2, attempt);
+        const jitter = Math.random() * 1000; // Add randomness to prevent thundering herd
+        const delay = Math.min(baseDelay + jitter, 10000);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -120,10 +133,12 @@ export async function acquireTokenSilentWithRetry(
 }
 
 /**
- * Refresh token for active account
+ * Refresh token for active account with rotation support
+ * Uses refresh token to get new access token
  */
 export async function refreshToken(
-  account?: AccountInfo
+  account?: AccountInfo,
+  forceRefresh = false
 ): Promise<AuthenticationResult | null> {
   const msalInstance = getMsalInstance();
   const activeAccount = account || msalInstance.getActiveAccount();
@@ -134,16 +149,22 @@ export async function refreshToken(
   }
   
   try {
+    // Try silent token acquisition first (uses refresh token if available)
     const result = await acquireTokenSilentWithRetry({
       ...tokenRequest,
       account: activeAccount,
-      forceRefresh: false,
+      forceRefresh, // Force refresh to rotate token
     });
+    
+    // Validate new token
+    if (!isTokenValid(result.expiresOn)) {
+      throw new Error('Refreshed token is invalid or expiring soon');
+    }
     
     return result;
   } catch (error) {
     if (error instanceof InteractionRequiredAuthError) {
-      console.warn('[MSAL] Interaction required for token refresh');
+      console.warn('[MSAL] Interaction required for token refresh - user needs to re-authenticate');
       // Caller should handle redirect/popup
       throw error;
     }
@@ -154,8 +175,19 @@ export async function refreshToken(
 }
 
 /**
- * Schedule automatic token refresh
+ * Rotate tokens (get new access token using refresh token)
+ * This is called proactively before token expiry
+ */
+export async function rotateTokens(
+  account?: AccountInfo
+): Promise<AuthenticationResult | null> {
+  return refreshToken(account, true);
+}
+
+/**
+ * Schedule automatic token refresh with rotation
  * Refreshes token 5 minutes before expiry
+ * Implements token rotation for security
  */
 export function scheduleTokenRefresh(
   expiresOn: Date | undefined | null,
@@ -177,7 +209,18 @@ export function scheduleTokenRefresh(
   
   // Don't schedule if token is already expired/expiring
   if (delay <= 0) {
-    console.warn('[MSAL] Token already expired, skipping schedule');
+    console.warn('[MSAL] Token already expired, attempting immediate refresh');
+    // Try immediate refresh
+    refreshToken(undefined, true)
+      .then(async (result) => {
+        if (result) {
+          await onRefresh(result);
+          scheduleTokenRefresh(result.expiresOn, onRefresh);
+        }
+      })
+      .catch((error) => {
+        console.error('[MSAL] Immediate token refresh failed:', error);
+      });
     return;
   }
   
@@ -185,7 +228,8 @@ export function scheduleTokenRefresh(
   
   tokenRefreshTimer = setTimeout(async () => {
     try {
-      const result = await refreshToken();
+      // Use token rotation (force refresh) for better security
+      const result = await rotateTokens();
       if (result) {
         await onRefresh(result);
         // Schedule next refresh
@@ -193,7 +237,21 @@ export function scheduleTokenRefresh(
       }
     } catch (error) {
       console.error('[MSAL] Scheduled token refresh failed:', error);
-      // Don't schedule another refresh on failure
+      
+      // If refresh fails, try again in 1 minute (might be transient)
+      if (error instanceof Error && !(error instanceof InteractionRequiredAuthError)) {
+        setTimeout(async () => {
+          try {
+            const retryResult = await refreshToken();
+            if (retryResult) {
+              await onRefresh(retryResult);
+              scheduleTokenRefresh(retryResult.expiresOn, onRefresh);
+            }
+          } catch (retryError) {
+            console.error('[MSAL] Token refresh retry failed:', retryError);
+          }
+        }, 60 * 1000); // Retry in 1 minute
+      }
     }
   }, delay);
 }

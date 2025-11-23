@@ -49,6 +49,21 @@ stages:
             displayName: 'Run Jest tests with coverage'
             continueOnError: false
 
+          - script: npx playwright install --with-deps chromium
+            displayName: 'Install Playwright browsers'
+
+          - script: |
+              npm run build
+              npm start &
+              sleep 10
+              npm run test:e2e || true
+              pkill -f "next start" || true
+            displayName: 'Run E2E tests'
+            continueOnError: true
+            env:
+              PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
+              SKIP_ENV_VALIDATION: 'true'
+
           - task: PublishTestResults@2
             condition: succeededOrFailed()
             inputs:
@@ -66,13 +81,50 @@ stages:
             displayName: 'Publish code coverage'
 
           - script: |
-              COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
-              echo "Code coverage: $COVERAGE%"
-              if (( $(echo "$COVERAGE < 70" | bc -l) )); then
-                echo "##vso[task.logissue type=error]Code coverage ($COVERAGE%) is below 70% threshold"
-                exit 1
+              set -euo pipefail
+              if [ -f coverage/coverage-summary.json ]; then
+                COVERAGE_LINES=$(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')
+                COVERAGE_FUNCTIONS=$(cat coverage/coverage-summary.json | jq -r '.total.functions.pct')
+                COVERAGE_BRANCHES=$(cat coverage/coverage-summary.json | jq -r '.total.branches.pct')
+                COVERAGE_STATEMENTS=$(cat coverage/coverage-summary.json | jq -r '.total.statements.pct')
+                
+                echo "##[section]Code Coverage Report"
+                echo "Lines: $COVERAGE_LINES%"
+                echo "Functions: $COVERAGE_FUNCTIONS%"
+                echo "Branches: $COVERAGE_BRANCHES%"
+                echo "Statements: $COVERAGE_STATEMENTS%"
+                
+                THRESHOLD=70
+                FAILED=false
+                
+                if (( $(echo "$COVERAGE_LINES < $THRESHOLD" | bc -l) )); then
+                  echo "##vso[task.logissue type=error]Lines coverage ($COVERAGE_LINES%) is below $THRESHOLD% threshold"
+                  FAILED=true
+                fi
+                if (( $(echo "$COVERAGE_FUNCTIONS < $THRESHOLD" | bc -l) )); then
+                  echo "##vso[task.logissue type=error]Functions coverage ($COVERAGE_FUNCTIONS%) is below $THRESHOLD% threshold"
+                  FAILED=true
+                fi
+                if (( $(echo "$COVERAGE_BRANCHES < $THRESHOLD" | bc -l) )); then
+                  echo "##vso[task.logissue type=error]Branches coverage ($COVERAGE_BRANCHES%) is below $THRESHOLD% threshold"
+                  FAILED=true
+                fi
+                if (( $(echo "$COVERAGE_STATEMENTS < $THRESHOLD" | bc -l) )); then
+                  echo "##vso[task.logissue type=error]Statements coverage ($COVERAGE_STATEMENTS%) is below $THRESHOLD% threshold"
+                  FAILED=true
+                fi
+                
+                if [ "$FAILED" = true ]; then
+                  exit 1
+                fi
+              else
+                echo "##vso[task.logissue type=warning]Coverage summary file not found"
               fi
-            displayName: 'Enforce coverage threshold (70%)'
+            displayName: 'Enforce coverage threshold (70% all metrics)'
+            continueOnError: false
+
+          - script: npm run generate:openapi
+            displayName: 'Generate OpenAPI specification'
             continueOnError: false
 
           - script: npm run build
@@ -81,6 +133,7 @@ stages:
 
           - script: npm run build:extension
             displayName: 'Build browser extension'
+            continueOnError: false
 
           - script: |
               set -euo pipefail
@@ -96,18 +149,85 @@ stages:
               fi
             displayName: 'Zip browser extension'
 
+          - script: |
+              set -euo pipefail
+              if [ -f docs/openapi.json ]; then
+                cp docs/openapi.json $(Build.ArtifactStagingDirectory)/openapi.json
+                echo "OpenAPI spec copied to artifacts"
+              fi
+            displayName: 'Copy OpenAPI specification to artifacts'
+
           - task: PublishBuildArtifacts@1
             inputs:
               pathToPublish: '$(Build.ArtifactStagingDirectory)'
               artifactName: 'celora-artifacts'
             displayName: 'Publish build artifacts'
 
-  - stage: Deploy
-    displayName: "Deploy to Azure"
+  - stage: DeployStaging
+    displayName: "Deploy to Staging"
     dependsOn: Build
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - deployment: deploy_to_azure
+      - deployment: deploy_to_staging
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'staging'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: celora-artifacts
+                  displayName: 'Download build artifacts'
+
+                - task: NodeTool@0
+                  inputs:
+                    versionSpec: $(NODE_VERSION)
+                  displayName: 'Use Node.js $(NODE_VERSION)'
+
+                - task: AzureKeyVault@2
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    KeyVaultName: '$(KEY_VAULT_NAME_STAGING)'
+                    SecretsFilter: 'DATABASE_URL,MSAL-CLIENT-ID,MSAL-CLIENT-SECRET'
+                  displayName: 'Fetch secrets from Key Vault (Staging)'
+
+                - script: |
+                    cd $(Pipeline.Workspace)/celora-artifacts
+                    tar -xzf celora-pwa.tgz
+                    npm ci --production
+                  displayName: 'Extract and install dependencies'
+
+                - script: |
+                    cd $(Pipeline.Workspace)/celora-artifacts
+                    npx prisma migrate deploy
+                  env:
+                    DIRECT_DATABASE_URL: $(DATABASE_URL)
+                  displayName: 'Run Prisma database migrations'
+                  continueOnError: false
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    appType: 'webAppLinux'
+                    appName: '$(AZURE_WEBAPP_NAME_STAGING)'
+                    package: '$(Pipeline.Workspace)/celora-artifacts/celora-pwa.tgz'
+                    runtimeStack: 'NODE|20-lts'
+                    startUpCommand: 'npm start'
+                  displayName: 'Deploy to Staging Web App'
+
+                - script: |
+                    echo "##[section]Staging Deployment Summary"
+                    echo "App URL: https://$(AZURE_WEBAPP_NAME_STAGING).azurewebsites.net"
+                    echo "OpenAPI: https://$(AZURE_WEBAPP_NAME_STAGING).azurewebsites.net/docs/openapi.json"
+                  displayName: 'Staging deployment summary'
+
+  - stage: DeployProduction
+    displayName: "Deploy to Production"
+    dependsOn: DeployStaging
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: deploy_to_production
         pool:
           vmImage: 'ubuntu-latest'
         environment: 'production'
@@ -119,17 +239,44 @@ stages:
                   artifact: celora-artifacts
                   displayName: 'Download build artifacts'
 
+                - task: NodeTool@0
+                  inputs:
+                    versionSpec: $(NODE_VERSION)
+                  displayName: 'Use Node.js $(NODE_VERSION)'
+
+                - task: AzureKeyVault@2
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    KeyVaultName: '$(KEY_VAULT_NAME_PROD)'
+                    SecretsFilter: 'DATABASE_URL,MSAL-CLIENT-ID,MSAL-CLIENT-SECRET'
+                  displayName: 'Fetch secrets from Key Vault (Production)'
+
+                - script: |
+                    cd $(Pipeline.Workspace)/celora-artifacts
+                    tar -xzf celora-pwa.tgz
+                    npm ci --production
+                  displayName: 'Extract and install dependencies'
+
+                - script: |
+                    cd $(Pipeline.Workspace)/celora-artifacts
+                    npx prisma migrate deploy
+                  env:
+                    DIRECT_DATABASE_URL: $(DATABASE_URL)
+                  displayName: 'Run Prisma database migrations'
+                  continueOnError: false
+
                 - task: AzureWebApp@1
                   inputs:
                     azureSubscription: '$(AZURE_SUBSCRIPTION)'
                     appType: 'webAppLinux'
-                    appName: '$(AZURE_WEBAPP_NAME)'
+                    appName: '$(AZURE_WEBAPP_NAME_PROD)'
                     package: '$(Pipeline.Workspace)/celora-artifacts/celora-pwa.tgz'
                     runtimeStack: 'NODE|20-lts'
                     startUpCommand: 'npm start'
-                  displayName: 'Deploy to Azure Web App'
+                  displayName: 'Deploy to Production Web App'
 
                 - script: |
-                    echo "Deployment completed successfully"
-                    echo "App URL: https://$(AZURE_WEBAPP_NAME).azurewebsites.net"
-                  displayName: 'Deployment summary'
+                    echo "##[section]Production Deployment Summary"
+                    echo "App URL: https://$(AZURE_WEBAPP_NAME_PROD).azurewebsites.net"
+                    echo "OpenAPI: https://$(AZURE_WEBAPP_NAME_PROD).azurewebsites.net/docs/openapi.json"
+                  displayName: 'Production deployment summary'

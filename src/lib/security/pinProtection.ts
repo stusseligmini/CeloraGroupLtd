@@ -148,3 +148,59 @@ export function resetPinAttempts(userId: string, walletId: string): void {
   const key = `${userId}:${walletId}`;
   pinAttempts.delete(key);
 }
+
+/**
+ * Session-based vault unlock tracking
+ * Stores unlocked vault state in memory with expiration
+ */
+const unlockedVaults = new Map<string, { expiresAt: number }>();
+
+/**
+ * Mark vault as unlocked for a session
+ */
+export function markVaultUnlocked(userId: string, walletId: string, durationMs: number = 5 * 60 * 1000): void {
+  const key = `${userId}:${walletId}`;
+  unlockedVaults.set(key, {
+    expiresAt: Date.now() + durationMs,
+  });
+}
+
+/**
+ * Check if vault is unlocked in current session
+ */
+export function isVaultUnlocked(userId: string, walletId: string): boolean {
+  const key = `${userId}:${walletId}`;
+  const record = unlockedVaults.get(key);
+  
+  if (!record) {
+    return false;
+  }
+  
+  // Check if expired
+  if (Date.now() > record.expiresAt) {
+    unlockedVaults.delete(key);
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Clear vault unlock session
+ */
+export function clearVaultUnlock(userId: string, walletId: string): void {
+  const key = `${userId}:${walletId}`;
+  unlockedVaults.delete(key);
+}
+
+/**
+ * Clear all vault unlocks for a user (e.g., on logout)
+ */
+export function clearAllVaultUnlocks(userId: string): void {
+  const prefix = `${userId}:`;
+  for (const key of unlockedVaults.keys()) {
+    if (key.startsWith(prefix)) {
+      unlockedVaults.delete(key);
+    }
+  }
+}

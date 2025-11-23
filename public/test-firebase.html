@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firebase Authentication Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .section {
+      background: #1e293b;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .success {
+      color: #22c55e;
+    }
+    .error {
+      color: #ef4444;
+    }
+    .output {
+      background: #0f172a;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 Firebase Authentication Test</h1>
+  
+  <div class="section">
+    <h2>1️⃣ Anonymous Authentication</h2>
+    <button onclick="testAnonymousAuth()">Sign In Anonymously</button>
+    <div id="anonymousOutput" class="output"></div>
+  </div>
+  
+  <div class="section">
+    <h2>2️⃣ Custom Token Authentication (Telegram)</h2>
+    <label>Telegram ID: <input type="text" id="telegramId" value="123456789" style="padding: 8px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0;"></label>
+    <button onclick="testCustomToken()">Get Custom Token</button>
+    <div id="customTokenOutput" class="output"></div>
+  </div>
+  
+  <div class="section">
+    <h2>3️⃣ Current User</h2>
+    <button onclick="checkCurrentUser()">Check Current User</button>
+    <button onclick="signOut()">Sign Out</button>
+    <div id="userOutput" class="output"></div>
+  </div>
+  
+  <div class="section">
+    <h2>4️⃣ Firestore Test</h2>
+    <button onclick="testFirestore()">Create Test Wallet</button>
+    <button onclick="readFirestore()">Read Wallets</button>
+    <div id="firestoreOutput" class="output"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, signInAnonymously, signInWithCustomToken, signOut as firebaseSignOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, addDoc, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAnauWfK21qclea_kZM-GqDCHpzombR884",
+      authDomain: "celora-7b552.firebaseapp.com",
+      projectId: "celora-7b552",
+      storageBucket: "celora-7b552.firebasestorage.app",
+      messagingSenderId: "505448793868",
+      appId: "1:505448793868:web:df0e3f80e669ab47a26b29"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Make functions globally available
+    window.testAnonymousAuth = async function() {
+      const output = document.getElementById('anonymousOutput');
+      try {
+        output.innerHTML = '🔄 Signing in anonymously...';
+        const userCredential = await signInAnonymously(auth);
+        output.innerHTML = `<span class="success">✅ Success!</span>\n${JSON.stringify({
+          uid: userCredential.user.uid,
+          isAnonymous: userCredential.user.isAnonymous,
+          metadata: userCredential.user.metadata
+        }, null, 2)}`;
+      } catch (error) {
+        output.innerHTML = `<span class="error">❌ Error:</span>\n${error.message}`;
+      }
+    };
+
+    window.testCustomToken = async function() {
+      const output = document.getElementById('customTokenOutput');
+      const telegramId = document.getElementById('telegramId').value;
+      
+      try {
+        output.innerHTML = '🔄 Getting custom token from API...';
+        
+        // Call our API to generate custom token
+        const response = await fetch('/api/telegram/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get token');
+        }
+        
+        output.innerHTML = `<span class="success">✅ Got token!</span>\n${JSON.stringify(data, null, 2)}\n\n🔄 Signing in with custom token...`;
+        
+        // Sign in with custom token
+        const userCredential = await signInWithCustomToken(auth, data.token);
+        
+        output.innerHTML = `<span class="success">✅ Signed in successfully!</span>\n${JSON.stringify({
+          uid: userCredential.user.uid,
+          isAnonymous: userCredential.user.isAnonymous,
+          metadata: userCredential.user.metadata
+        }, null, 2)}`;
+        
+      } catch (error) {
+        output.innerHTML = `<span class="error">❌ Error:</span>\n${error.message}`;
+      }
+    };
+
+    window.checkCurrentUser = function() {
+      const output = document.getElementById('userOutput');
+      const user = auth.currentUser;
+      
+      if (user) {
+        output.innerHTML = `<span class="success">✅ User signed in:</span>\n${JSON.stringify({
+          uid: user.uid,
+          isAnonymous: user.isAnonymous,
+          email: user.email,
+          metadata: user.metadata
+        }, null, 2)}`;
+      } else {
+        output.innerHTML = '<span class="error">❌ No user signed in</span>';
+      }
+    };
+
+    window.signOut = async function() {
+      const output = document.getElementById('userOutput');
+      try {
+        await firebaseSignOut(auth);
+        output.innerHTML = '<span class="success">✅ Signed out successfully</span>';
+      } catch (error) {
+        output.innerHTML = `<span class="error">❌ Error:</span>\n${error.message}`;
+      }
+    };
+
+    window.testFirestore = async function() {
+      const output = document.getElementById('firestoreOutput');
+      const user = auth.currentUser;
+      
+      if (!user) {
+        output.innerHTML = '<span class="error">❌ Please sign in first!</span>';
+        return;
+      }
+      
+      try {
+        output.innerHTML = '🔄 Creating test wallet...';
+        
+        const walletRef = collection(db, `users/${user.uid}/wallets`);
+        const docRef = await addDoc(walletRef, {
+          blockchain: 'SOLANA',
+          label: 'Test Wallet ' + Date.now(),
+          userId: user.uid,
+          createdAt: new Date(),
+          balance: '0'
+        });
+        
+        output.innerHTML = `<span class="success">✅ Wallet created!</span>\nDocument ID: ${docRef.id}`;
+        
+      } catch (error) {
+        output.innerHTML = `<span class="error">❌ Error:</span>\n${error.message}\n\nMake sure Firestore database is created in Firebase Console!`;
+      }
+    };
+
+    window.readFirestore = async function() {
+      const output = document.getElementById('firestoreOutput');
+      const user = auth.currentUser;
+      
+      if (!user) {
+        output.innerHTML = '<span class="error">❌ Please sign in first!</span>';
+        return;
+      }
+      
+      try {
+        output.innerHTML = '🔄 Reading wallets...';
+        
+        const walletRef = collection(db, `users/${user.uid}/wallets`);
+        const querySnapshot = await getDocs(walletRef);
+        
+        const wallets = [];
+        querySnapshot.forEach((doc) => {
+          wallets.push({ id: doc.id, ...doc.data() });
+        });
+        
+        output.innerHTML = `<span class="success">✅ Found ${wallets.length} wallet(s):</span>\n${JSON.stringify(wallets, null, 2)}`;
+        
+      } catch (error) {
+        output.innerHTML = `<span class="error">❌ Error:</span>\n${error.message}`;
+      }
+    };
+
+    // Check auth state on load
+    auth.onAuthStateChanged((user) => {
+      console.log('Auth state changed:', user ? user.uid : 'No user');
+    });
+  </script>
+</body>
+</html>

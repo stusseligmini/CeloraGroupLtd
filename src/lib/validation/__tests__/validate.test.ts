@@ -22,66 +22,62 @@ describe('validateBody', () => {
   });
   
   it('should validate valid body', async () => {
-    const body = { name: 'John', age: 30 };
-    const result = await validateBody(body, TestSchema);
+    const request = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'John', age: 30 }),
+    });
     
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data).toEqual(body);
-    }
+    const result = await validateBody(request, TestSchema);
+    
+    expect(result.name).toBe('John');
+    expect(result.age).toBe(30);
   });
   
-  it('should return error for invalid body', async () => {
-    const body = { name: '', age: -5 };
-    const result = await validateBody(body, TestSchema);
+  it('should throw ValidationError for invalid body', async () => {
+    const request = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      body: JSON.stringify({ name: '', age: -5 }),
+    });
     
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues).toHaveLength(2);
-    }
+    await expect(validateBody(request, TestSchema)).rejects.toThrow();
   });
   
   it('should handle missing fields', async () => {
-    const body = { name: 'John' };
-    const result = await validateBody(body, TestSchema);
+    const request = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'John' }),
+    });
     
-    expect(result.success).toBe(false);
+    await expect(validateBody(request, TestSchema)).rejects.toThrow();
   });
 });
 
 describe('validateQuery', () => {
   const QuerySchema = z.object({
-    limit: z.string().transform(Number).pipe(z.number().max(100)).default('20'),
-    offset: z.string().transform(Number).pipe(z.number().min(0)).default('0'),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
   });
   
   it('should validate valid query params', () => {
-    const searchParams = new URLSearchParams('limit=10&offset=5');
-    const result = validateQuery(searchParams, QuerySchema);
+    const request = new NextRequest('http://localhost/api/test?limit=10&offset=5');
+    const result = validateQuery(request, QuerySchema);
     
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.limit).toBe(10);
-      expect(result.data.offset).toBe(5);
-    }
+    expect(result.limit).toBe(10);
+    expect(result.offset).toBe(5);
   });
   
   it('should use default values', () => {
-    const searchParams = new URLSearchParams();
-    const result = validateQuery(searchParams, QuerySchema);
+    const request = new NextRequest('http://localhost/api/test');
+    const result = validateQuery(request, QuerySchema);
     
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.limit).toBe(20);
-      expect(result.data.offset).toBe(0);
-    }
+    expect(result.limit).toBe(20);
+    expect(result.offset).toBe(0);
   });
   
-  it('should reject invalid values', () => {
-    const searchParams = new URLSearchParams('limit=200&offset=-1');
-    const result = validateQuery(searchParams, QuerySchema);
+  it('should throw ValidationError for invalid values', () => {
+    const request = new NextRequest('http://localhost/api/test?limit=200&offset=-1');
     
-    expect(result.success).toBe(false);
+    expect(() => validateQuery(request, QuerySchema)).toThrow();
   });
 });
 
@@ -94,58 +90,33 @@ describe('validateParams', () => {
     const params = { id: '123e4567-e89b-12d3-a456-426614174000' };
     const result = validateParams(params, ParamSchema);
     
-    expect(result.success).toBe(true);
+    expect(result.id).toBe('123e4567-e89b-12d3-a456-426614174000');
   });
   
-  it('should reject invalid UUID', () => {
+  it('should throw ValidationError for invalid UUID', () => {
     const params = { id: 'not-a-uuid' };
-    const result = validateParams(params, ParamSchema);
     
-    expect(result.success).toBe(false);
+    expect(() => validateParams(params, ParamSchema)).toThrow();
   });
 });
 
 describe('validationErrorResponse', () => {
-  it('should format validation error correctly', () => {
-    const error = new z.ZodError([
-      {
-        code: 'invalid_type',
-        expected: 'string',
-        received: 'number',
-        path: ['name'],
-        message: 'Expected string, received number',
-      },
+  it('should format validation error correctly', async () => {
+    const { ValidationError } = await import('../validate');
+    const error = new ValidationError([
+      { field: 'name', message: 'Expected string, received number' },
     ]);
     
     const response = validationErrorResponse(error);
     
     expect(response.status).toBe(400);
-    
-    // Parse response body
-    const json = JSON.parse(JSON.stringify(response));
-    expect(json).toMatchObject({
-      error: 'Validation Error',
-      message: 'Invalid request data',
-    });
   });
   
-  it('should include multiple validation errors', () => {
-    const error = new z.ZodError([
-      {
-        code: 'invalid_type',
-        expected: 'string',
-        received: 'number',
-        path: ['name'],
-        message: 'Expected string',
-      },
-      {
-        code: 'too_small',
-        minimum: 1,
-        type: 'number',
-        inclusive: true,
-        path: ['age'],
-        message: 'Must be positive',
-      },
+  it('should include multiple validation errors', async () => {
+    const { ValidationError } = await import('../validate');
+    const error = new ValidationError([
+      { field: 'name', message: 'Expected string' },
+      { field: 'age', message: 'Must be positive' },
     ]);
     
     const response = validationErrorResponse(error);
@@ -183,32 +154,32 @@ describe('Integration: Full validation flow', () => {
   });
   
   it('should validate complete user object', async () => {
-    const body = {
-      email: 'user@example.com',
-      password: 'SecurePass123!',
-      age: 25,
-    };
+    const request = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'user@example.com',
+        password: 'SecurePass123!',
+        age: 25,
+      }),
+    });
     
-    const result = await validateBody(body, UserSchema);
+    const result = await validateBody(request, UserSchema);
     
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.email).toBe('user@example.com');
-    }
+    expect(result.email).toBe('user@example.com');
+    expect(result.password).toBe('SecurePass123!');
+    expect(result.age).toBe(25);
   });
   
   it('should catch all validation errors', async () => {
-    const body = {
-      email: 'invalid-email',
-      password: '123',
-      age: 15,
-    };
+    const request = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'invalid-email',
+        password: '123',
+        age: 15,
+      }),
+    });
     
-    const result = await validateBody(body, UserSchema);
-    
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.length).toBeGreaterThan(0);
-    }
+    await expect(validateBody(request, UserSchema)).rejects.toThrow();
   });
 });

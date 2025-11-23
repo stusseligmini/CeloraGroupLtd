@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { checkDatabaseHealth } from '@/server/db/client';
 import { HealthCheckResponseSchema } from '@/lib/validation/schemas';
 import { successResponse } from '@/lib/validation/validate';
+import { logger } from '@/lib/logger';
 
 export async function GET() {
   const requestId = crypto.randomUUID();
@@ -55,7 +56,7 @@ export async function GET() {
 
     return successResponse(healthCheck, isHealthy ? 200 : 503, requestId);
   } catch (error) {
-    console.error('[Health Check Error]', error);
+    logger.error('Health check error', error, { requestId });
 
     return NextResponse.json(
       {

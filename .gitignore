@@ -32,6 +32,7 @@ cypress/videos/
 *.pem
 *.key
 *.crt
+secrets/
 
 # Testing
 coverage/

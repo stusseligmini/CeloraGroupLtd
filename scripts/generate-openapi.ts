@@ -7,6 +7,92 @@
 
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import * as schemas from '../src/lib/validation/schemas';
+import { z } from 'zod';
+
+/**
+ * Convert Zod schema to OpenAPI schema
+ */
+function zodToOpenApi(schema: z.ZodTypeAny): any {
+  if (schema instanceof z.ZodString) {
+    const result: any = { type: 'string' };
+    if (schema._def.checks) {
+      for (const check of schema._def.checks) {
+        if (check.kind === 'min') result.minLength = check.value;
+        if (check.kind === 'max') result.maxLength = check.value;
+        if (check.kind === 'email') result.format = 'email';
+        if (check.kind === 'uuid') result.format = 'uuid';
+        if (check.kind === 'datetime') result.format = 'date-time';
+        if (check.kind === 'regex') result.pattern = check.regex.source;
+      }
+    }
+    return result;
+  }
+
+  if (schema instanceof z.ZodNumber) {
+    const result: any = { type: 'number' };
+    if (schema._def.checks) {
+      for (const check of schema._def.checks) {
+        if (check.kind === 'min') result.minimum = check.value;
+        if (check.kind === 'max') result.maximum = check.value;
+        if (check.kind === 'int') result.type = 'integer';
+      }
+    }
+    return result;
+  }
+
+  if (schema instanceof z.ZodBoolean) {
+    return { type: 'boolean' };
+  }
+
+  if (schema instanceof z.ZodEnum) {
+    return { type: 'string', enum: schema._def.values };
+  }
+
+  if (schema instanceof z.ZodArray) {
+    return {
+      type: 'array',
+      items: zodToOpenApi(schema._def.type),
+    };
+  }
+
+  if (schema instanceof z.ZodObject) {
+    const properties: any = {};
+    const required: string[] = [];
+    
+    for (const [key, value] of Object.entries(schema._def.shape())) {
+      const fieldSchema = value as z.ZodTypeAny;
+      properties[key] = zodToOpenApi(fieldSchema);
+      
+      // Check if field is optional
+      if (!(fieldSchema instanceof z.ZodOptional) && !(fieldSchema instanceof z.ZodDefault)) {
+        required.push(key);
+      }
+    }
+
+    const result: any = { type: 'object', properties };
+    if (required.length > 0) {
+      result.required = required;
+    }
+    return result;
+  }
+
+  if (schema instanceof z.ZodOptional) {
+    return zodToOpenApi(schema._def.innerType);
+  }
+
+  if (schema instanceof z.ZodDefault) {
+    return zodToOpenApi(schema._def.innerType);
+  }
+
+  if (schema instanceof z.ZodNullable) {
+    const inner = zodToOpenApi(schema._def.innerType);
+    return { ...inner, nullable: true };
+  }
+
+  // Fallback
+  return { type: 'object' };
+}
 
 const openApiSpec = {
   openapi: '3.0.3',
@@ -38,6 +124,10 @@ const openApiSpec = {
     { name: 'Wallet', description: 'Multi-chain wallet operations' },
     { name: 'Transactions', description: 'Transaction history and management' },
     { name: 'Notifications', description: 'Push and in-app notifications' },
+    { name: 'Cards', description: 'Virtual card management' },
+    { name: 'Swap', description: 'Token swap operations' },
+    { name: 'Staking', description: 'Staking operations' },
+    { name: 'Budget', description: 'Budget and spending limits' },
     { name: 'Diagnostics', description: 'Health checks and system status' },
   ],
   paths: {
@@ -72,24 +162,28 @@ const openApiSpec = {
               },
             },
           },
-          '500': {
-            description: 'Internal server error',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/Error' },
-              },
-            },
-          },
         },
       },
-      delete: {
-        tags: ['Auth'],
-        summary: 'Delete session',
-        description: 'Clears session cookies',
-        operationId: 'deleteSession',
+    },
+    '/wallet/list': {
+      get: {
+        tags: ['Wallet'],
+        summary: 'List wallets',
+        description: 'Returns paginated list of wallets',
+        operationId: 'listWallets',
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+          { name: 'blockchain', in: 'query', schema: { type: 'string', enum: ['celo', 'ethereum', 'bitcoin', 'solana'] } },
+        ],
         responses: {
           '200': {
-            description: 'Session cleared successfully',
+            description: 'Wallets retrieved successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/WalletListResponse' },
+              },
+            },
           },
         },
       },
@@ -100,29 +194,12 @@ const openApiSpec = {
         summary: 'Get wallet summary',
         description: 'Returns total balance and recent transactions across all wallets',
         operationId: 'getWalletSummary',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            name: 'x-user-id',
-            in: 'header',
-            required: true,
-            schema: { type: 'string', format: 'uuid' },
-          },
-        ],
         responses: {
           '200': {
             description: 'Wallet summary retrieved successfully',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/WalletSummaryResponse' },
-              },
-            },
-          },
-          '401': {
-            description: 'Unauthorized',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/Error' },
               },
             },
           },
@@ -135,33 +212,11 @@ const openApiSpec = {
         summary: 'List notifications',
         description: 'Returns paginated list of notifications with optional filters',
         operationId: 'listNotifications',
-        security: [{ bearerAuth: [] }],
         parameters: [
-          {
-            name: 'page',
-            in: 'query',
-            schema: { type: 'integer', minimum: 1, default: 1 },
-          },
-          {
-            name: 'limit',
-            in: 'query',
-            schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
-          },
-          {
-            name: 'status',
-            in: 'query',
-            schema: { type: 'string', enum: ['pending', 'sent', 'delivered', 'failed', 'read'] },
-          },
-          {
-            name: 'type',
-            in: 'query',
-            schema: { type: 'string', enum: ['transaction', 'security', 'system', 'promotion'] },
-          },
-          {
-            name: 'priority',
-            in: 'query',
-            schema: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
-          },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'sent', 'delivered', 'failed', 'read'] } },
+          { name: 'type', in: 'query', schema: { type: 'string', enum: ['transaction', 'security', 'system', 'promotion'] } },
         ],
         responses: {
           '200': {
@@ -195,7 +250,6 @@ const openApiSpec = {
         summary: 'Mark notifications as read',
         description: 'Marks multiple notifications as read',
         operationId: 'markNotificationsAsRead',
-        security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -208,13 +262,200 @@ const openApiSpec = {
           '200': {
             description: 'Notifications updated successfully',
           },
-          '400': {
-            description: 'Validation error',
+        },
+      },
+    },
+    '/cards': {
+      get: {
+        tags: ['Cards'],
+        summary: 'List cards',
+        description: 'Returns paginated list of virtual cards',
+        operationId: 'listCards',
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+          { name: 'walletId', in: 'query', schema: { type: 'string', format: 'uuid' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['active', 'frozen', 'cancelled'] } },
+        ],
+        responses: {
+          '200': {
+            description: 'Cards retrieved successfully',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ValidationError' },
+                schema: {
+                  type: 'object',
+                  properties: {
+                    cards: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/CardResponse' },
+                    },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        page: { type: 'integer' },
+                        limit: { type: 'integer' },
+                        total: { type: 'integer' },
+                      },
+                    },
+                  },
+                },
               },
             },
+          },
+        },
+      },
+      post: {
+        tags: ['Cards'],
+        summary: 'Create card',
+        description: 'Creates a new virtual card',
+        operationId: 'createCard',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CardCreateRequest' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Card created successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CardDetailsResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/swap/quote': {
+      post: {
+        tags: ['Swap'],
+        summary: 'Get swap quote',
+        description: 'Returns a quote for token swap',
+        operationId: 'getSwapQuote',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/SwapQuoteRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Quote retrieved successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SwapQuoteResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/swap': {
+      post: {
+        tags: ['Swap'],
+        summary: 'Execute swap',
+        description: 'Executes a token swap',
+        operationId: 'executeSwap',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/SwapExecuteRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Swap executed successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SwapExecuteResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/staking': {
+      get: {
+        tags: ['Staking'],
+        summary: 'Get staking positions',
+        description: 'Returns all staking positions for user',
+        operationId: 'getStakingPositions',
+        responses: {
+          '200': {
+            description: 'Staking positions retrieved successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/StakingPositionsResponse' },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Staking'],
+        summary: 'Stake tokens',
+        description: 'Stakes tokens on supported blockchains',
+        operationId: 'stakeTokens',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/StakeRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Staking successful',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/StakeResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/budget': {
+      get: {
+        tags: ['Budget'],
+        summary: 'Get budget summary',
+        description: 'Returns spending summary and limits',
+        operationId: 'getBudgetSummary',
+        responses: {
+          '200': {
+            description: 'Budget summary retrieved successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/BudgetSummaryResponse' },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Budget'],
+        summary: 'Create spending limit',
+        description: 'Creates a new spending limit',
+        operationId: 'createSpendingLimit',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreateSpendingLimitRequest' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Spending limit created successfully',
           },
         },
       },
@@ -245,24 +486,6 @@ const openApiSpec = {
         },
       },
     },
-    '/diagnostics/env': {
-      get: {
-        tags: ['Diagnostics'],
-        summary: 'Environment diagnostics',
-        description: 'Returns configuration status (no secrets exposed)',
-        operationId: 'envDiagnostics',
-        responses: {
-          '200': {
-            description: 'Environment status',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/EnvDiagnosticsResponse' },
-              },
-            },
-          },
-        },
-      },
-    },
   },
   components: {
     securitySchemes: {
@@ -275,224 +498,52 @@ const openApiSpec = {
     },
     schemas: {
       // Auth
-      SessionRequest: {
-        type: 'object',
-        required: ['accessToken', 'expiresIn'],
-        properties: {
-          accessToken: { type: 'string', minLength: 1 },
-          refreshToken: { type: 'string' },
-          idToken: { type: 'string' },
-          expiresIn: { type: 'integer', minimum: 1 },
-        },
-      },
-      SessionResponse: {
-        type: 'object',
-        required: ['success', 'sessionId', 'expiresAt', 'user'],
-        properties: {
-          success: { type: 'boolean' },
-          sessionId: { type: 'string', format: 'uuid' },
-          expiresAt: { type: 'string', format: 'date-time' },
-          user: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', format: 'uuid' },
-              email: { type: 'string', format: 'email' },
-              displayName: { type: 'string', nullable: true },
-            },
-          },
-        },
-      },
+      SessionRequest: zodToOpenApi(schemas.SessionRequestSchema),
+      SessionResponse: zodToOpenApi(schemas.SessionResponseSchema),
       
       // Wallet
-      WalletSummaryResponse: {
-        type: 'object',
-        required: ['totalFiatBalance', 'fiatCurrency', 'wallets', 'recentTransactions'],
-        properties: {
-          totalFiatBalance: { type: 'number' },
-          fiatCurrency: { type: 'string' },
-          wallets: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                blockchain: { type: 'string', enum: ['celo', 'ethereum', 'bitcoin', 'solana'] },
-                address: { type: 'string' },
-                label: { type: 'string', nullable: true },
-                balanceCache: { type: 'string', nullable: true },
-                balanceFiat: { type: 'number', nullable: true },
-                isDefault: { type: 'boolean' },
-                lastSyncedAt: { type: 'string', format: 'date-time', nullable: true },
-              },
-            },
-          },
-          recentTransactions: {
-            type: 'array',
-            items: { $ref: '#/components/schemas/TransactionSummary' },
-          },
-        },
-      },
-      TransactionSummary: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' },
-          txHash: { type: 'string' },
-          blockchain: { type: 'string', enum: ['celo', 'ethereum', 'bitcoin', 'solana'] },
-          type: { type: 'string', nullable: true },
-          amount: { type: 'string' },
-          fromAddress: { type: 'string' },
-          toAddress: { type: 'string' },
-          status: { type: 'string' },
-          timestamp: { type: 'string', format: 'date-time' },
-        },
-      },
+      WalletListResponse: zodToOpenApi(schemas.WalletListResponseSchema),
+      WalletSummaryResponse: zodToOpenApi(schemas.WalletSummaryResponseSchema),
+      WalletCreateRequest: zodToOpenApi(schemas.WalletCreateRequestSchema),
+      WalletCreateResponse: zodToOpenApi(schemas.WalletCreateResponseSchema),
+      
+      // Cards
+      CardCreateRequest: zodToOpenApi(schemas.CardCreateRequestSchema),
+      CardUpdateRequest: zodToOpenApi(schemas.CardUpdateRequestSchema),
+      CardResponse: zodToOpenApi(schemas.CardResponseSchema),
+      CardDetailsResponse: zodToOpenApi(schemas.CardDetailsResponseSchema),
+      
+      // Swap
+      SwapQuoteRequest: zodToOpenApi(schemas.SwapQuoteRequestSchema),
+      SwapQuoteResponse: zodToOpenApi(schemas.SwapQuoteResponseSchema),
+      SwapExecuteRequest: zodToOpenApi(schemas.SwapExecuteRequestSchema),
+      SwapExecuteResponse: zodToOpenApi(schemas.SwapExecuteResponseSchema),
+      
+      // Staking
+      StakingPositionsResponse: zodToOpenApi(schemas.StakingPositionsResponseSchema),
+      StakeRequest: zodToOpenApi(schemas.StakeRequestSchema),
+      StakeResponse: zodToOpenApi(schemas.StakeResponseSchema),
+      
+      // Budget
+      BudgetSummaryResponse: zodToOpenApi(schemas.BudgetSummaryResponseSchema),
+      CreateSpendingLimitRequest: zodToOpenApi(schemas.CreateSpendingLimitRequestSchema),
       
       // Notifications
-      NotificationResponse: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', format: 'uuid' },
-          userId: { type: 'string', format: 'uuid' },
-          type: { type: 'string' },
-          title: { type: 'string' },
-          body: { type: 'string' },
-          channels: { type: 'array', items: { type: 'string' } },
-          status: { type: 'string' },
-          priority: { type: 'string' },
-          actionUrl: { type: 'string', nullable: true },
-          actionLabel: { type: 'string', nullable: true },
-          sentAt: { type: 'string', format: 'date-time', nullable: true },
-          deliveredAt: { type: 'string', format: 'date-time', nullable: true },
-          readAt: { type: 'string', format: 'date-time', nullable: true },
-          createdAt: { type: 'string', format: 'date-time' },
-        },
-      },
-      NotificationMarkAsReadRequest: {
-        type: 'object',
-        required: ['notificationIds'],
-        properties: {
-          notificationIds: {
-            type: 'array',
-            items: { type: 'string', format: 'uuid' },
-            minItems: 1,
-          },
-        },
-      },
+      NotificationResponse: zodToOpenApi(schemas.NotificationResponseSchema),
+      NotificationMarkAsReadRequest: zodToOpenApi(schemas.NotificationMarkAsReadRequestSchema),
       
       // Diagnostics
-      HealthCheckResponse: {
-        type: 'object',
-        required: ['status', 'version', 'timestamp', 'services'],
-        properties: {
-          status: { type: 'string', enum: ['healthy', 'degraded', 'unhealthy'] },
-          version: { type: 'string' },
-          timestamp: { type: 'string', format: 'date-time' },
-          services: {
-            type: 'object',
-            properties: {
-              database: {
-                type: 'object',
-                properties: {
-                  status: { type: 'string', enum: ['healthy', 'unhealthy'] },
-                  latency: { type: 'number', nullable: true },
-                  error: { type: 'string' },
-                },
-              },
-              redis: {
-                type: 'object',
-                properties: {
-                  status: { type: 'string', enum: ['healthy', 'unhealthy'] },
-                  latency: { type: 'number', nullable: true },
-                },
-              },
-              msal: {
-                type: 'object',
-                properties: {
-                  status: { type: 'string', enum: ['healthy', 'unhealthy'] },
-                  configured: { type: 'boolean' },
-                },
-              },
-            },
-          },
-        },
-      },
-      EnvDiagnosticsResponse: {
-        type: 'object',
-        required: [
-          'nodeEnv',
-          'nextVersion',
-          'databaseConfigured',
-          'redisConfigured',
-          'msalConfigured',
-          'azureKeyVaultConfigured',
-          'appInsightsConfigured',
-        ],
-        properties: {
-          nodeEnv: { type: 'string' },
-          nextVersion: { type: 'string' },
-          databaseConfigured: { type: 'boolean' },
-          redisConfigured: { type: 'boolean' },
-          msalConfigured: { type: 'boolean' },
-          azureKeyVaultConfigured: { type: 'boolean' },
-          appInsightsConfigured: { type: 'boolean' },
-        },
-      },
+      HealthCheckResponse: zodToOpenApi(schemas.HealthCheckResponseSchema),
+      EnvDiagnosticsResponse: zodToOpenApi(schemas.EnvDiagnosticsResponseSchema),
       
       // Errors
-      Error: {
-        type: 'object',
-        required: ['error'],
-        properties: {
-          error: {
-            type: 'object',
-            required: ['code', 'message', 'timestamp'],
-            properties: {
-              code: { type: 'string' },
-              message: { type: 'string' },
-              details: {},
-              timestamp: { type: 'string', format: 'date-time' },
-              requestId: { type: 'string', format: 'uuid' },
-            },
-          },
-        },
-      },
-      ValidationError: {
-        type: 'object',
-        required: ['error'],
-        properties: {
-          error: {
-            type: 'object',
-            required: ['code', 'message', 'fields', 'timestamp'],
-            properties: {
-              code: { type: 'string', enum: ['VALIDATION_ERROR'] },
-              message: { type: 'string' },
-              fields: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    field: { type: 'string' },
-                    message: { type: 'string' },
-                  },
-                },
-              },
-              timestamp: { type: 'string', format: 'date-time' },
-            },
-          },
-        },
-      },
+      Error: zodToOpenApi(schemas.ErrorResponseSchema),
+      ValidationError: zodToOpenApi(schemas.ValidationErrorResponseSchema),
     },
   },
 };
 
 // Write to file
-const outputPath = join(process.cwd(), 'docs', 'openapi.yaml');
-const yamlContent = `# Generated OpenAPI Specification
-# DO NOT EDIT MANUALLY - Generated from Zod schemas
-# Run: npm run generate:openapi
-
-${JSON.stringify(openApiSpec, null, 2)}
-`;
-
-writeFileSync(outputPath, yamlContent, 'utf8');
+const outputPath = join(process.cwd(), 'docs', 'openapi.json');
+writeFileSync(outputPath, JSON.stringify(openApiSpec, null, 2), 'utf8');
 console.log(`✅ OpenAPI spec generated: ${outputPath}`);

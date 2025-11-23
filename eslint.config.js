@@ -12,7 +12,18 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 
 module.exports = [
   {
-    ignores: ['node_modules/**', '.next/**', 'public/**', 'dist/**'],
+    ignores: [
+      'node_modules/**', 
+      '.next/**', 
+      'public/**', 
+      'dist/**',
+      'tailwind.config.ts',
+      'postcss.config.js',
+      'next.config.js',
+      'workbox-config.js',
+      'jest.setup.ts',
+      'jest.config.js'
+    ],
   },
   // Base JS recommended
   js.configs.recommended,
@@ -45,6 +56,7 @@ module.exports = [
       ],
       '@typescript-eslint/no-explicit-any': 'off',
       'react-hooks/exhaustive-deps': 'warn',
+      'no-case-declarations': 'error',
     },
   },
 ];

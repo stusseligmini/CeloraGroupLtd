@@ -1,0 +1,2030 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Celora API",
+    "description": "Production-ready PWA + MV3 Extension API with secure auth, wallet management, and notifications",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Celora Team",
+      "email": "support@celora.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://celora.io/api",
+      "description": "Production"
+    },
+    {
+      "url": "https://staging.celora.io/api",
+      "description": "Staging"
+    },
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Authentication and session management"
+    },
+    {
+      "name": "Wallet",
+      "description": "Multi-chain wallet operations"
+    },
+    {
+      "name": "Transactions",
+      "description": "Transaction history and management"
+    },
+    {
+      "name": "Notifications",
+      "description": "Push and in-app notifications"
+    },
+    {
+      "name": "Cards",
+      "description": "Virtual card management"
+    },
+    {
+      "name": "Swap",
+      "description": "Token swap operations"
+    },
+    {
+      "name": "Staking",
+      "description": "Staking operations"
+    },
+    {
+      "name": "Budget",
+      "description": "Budget and spending limits"
+    },
+    {
+      "name": "Diagnostics",
+      "description": "Health checks and system status"
+    }
+  ],
+  "paths": {
+    "/auth/b2c/session": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create session",
+        "description": "Creates a new session with MSAL tokens",
+        "operationId": "createSession",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallet/list": {
+      "get": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "List wallets",
+        "description": "Returns paginated list of wallets",
+        "operationId": "listWallets",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "blockchain",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "celo",
+                "ethereum",
+                "bitcoin",
+                "solana"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wallets retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallet/summary": {
+      "get": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Get wallet summary",
+        "description": "Returns total balance and recent transactions across all wallets",
+        "operationId": "getWalletSummary",
+        "responses": {
+          "200": {
+            "description": "Wallet summary retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List notifications",
+        "description": "Returns paginated list of notifications with optional filters",
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "sent",
+                "delivered",
+                "failed",
+                "read"
+              ]
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "transaction",
+                "security",
+                "system",
+                "promotion"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NotificationResponse"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark notifications as read",
+        "description": "Marks multiple notifications as read",
+        "operationId": "markNotificationsAsRead",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationMarkAsReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notifications updated successfully"
+          }
+        }
+      }
+    },
+    "/cards": {
+      "get": {
+        "tags": [
+          "Cards"
+        ],
+        "summary": "List cards",
+        "description": "Returns paginated list of virtual cards",
+        "operationId": "listCards",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "walletId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "frozen",
+                "cancelled"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cards retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CardResponse"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cards"
+        ],
+        "summary": "Create card",
+        "description": "Creates a new virtual card",
+        "operationId": "createCard",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Card created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardDetailsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/swap/quote": {
+      "post": {
+        "tags": [
+          "Swap"
+        ],
+        "summary": "Get swap quote",
+        "description": "Returns a quote for token swap",
+        "operationId": "getSwapQuote",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapQuoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quote retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapQuoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/swap": {
+      "post": {
+        "tags": [
+          "Swap"
+        ],
+        "summary": "Execute swap",
+        "description": "Executes a token swap",
+        "operationId": "executeSwap",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Swap executed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapExecuteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staking": {
+      "get": {
+        "tags": [
+          "Staking"
+        ],
+        "summary": "Get staking positions",
+        "description": "Returns all staking positions for user",
+        "operationId": "getStakingPositions",
+        "responses": {
+          "200": {
+            "description": "Staking positions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StakingPositionsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Staking"
+        ],
+        "summary": "Stake tokens",
+        "description": "Stakes tokens on supported blockchains",
+        "operationId": "stakeTokens",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StakeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Staking successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StakeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get budget summary",
+        "description": "Returns spending summary and limits",
+        "operationId": "getBudgetSummary",
+        "responses": {
+          "200": {
+            "description": "Budget summary retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Create spending limit",
+        "description": "Creates a new spending limit",
+        "operationId": "createSpendingLimit",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSpendingLimitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Spending limit created successfully"
+          }
+        }
+      }
+    },
+    "/diagnostics/health": {
+      "get": {
+        "tags": [
+          "Diagnostics"
+        ],
+        "summary": "Health check",
+        "description": "Returns system health status",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "System is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "System is unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "MSAL access token from Azure B2C"
+      }
+    },
+    "schemas": {
+      "SessionRequest": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "idToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresIn"
+        ]
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "displayName": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "displayName"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "sessionId",
+          "expiresAt",
+          "user"
+        ]
+      },
+      "WalletListResponse": {
+        "type": "object",
+        "properties": {
+          "wallets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "blockchain": {
+                  "type": "string",
+                  "enum": [
+                    "celo",
+                    "ethereum",
+                    "bitcoin",
+                    "solana"
+                  ]
+                },
+                "address": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "isDefault": {
+                  "type": "boolean"
+                },
+                "isHidden": {
+                  "type": "boolean"
+                },
+                "balanceCache": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "balanceFiat": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "fiatCurrency": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "blockchain",
+                "address",
+                "label",
+                "isDefault",
+                "isHidden",
+                "balanceCache",
+                "balanceFiat",
+                "fiatCurrency"
+              ]
+            }
+          }
+        },
+        "required": [
+          "wallets"
+        ]
+      },
+      "WalletSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "totalFiatBalance": {
+            "type": "number"
+          },
+          "fiatCurrency": {
+            "type": "string"
+          },
+          "wallets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "blockchain": {
+                  "type": "string",
+                  "enum": [
+                    "celo",
+                    "ethereum",
+                    "bitcoin",
+                    "solana"
+                  ]
+                },
+                "address": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "balanceCache": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "balanceFiat": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "isDefault": {
+                  "type": "boolean"
+                },
+                "lastSyncedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "blockchain",
+                "address",
+                "label",
+                "balanceCache",
+                "balanceFiat",
+                "isDefault",
+                "lastSyncedAt"
+              ]
+            }
+          },
+          "recentTransactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "txHash": {
+                  "type": "string"
+                },
+                "blockchain": {
+                  "type": "string",
+                  "enum": [
+                    "celo",
+                    "ethereum",
+                    "bitcoin",
+                    "solana"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "amount": {
+                  "type": "string"
+                },
+                "fromAddress": {
+                  "type": "string"
+                },
+                "toAddress": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "txHash",
+                "blockchain",
+                "type",
+                "amount",
+                "fromAddress",
+                "toAddress",
+                "status",
+                "timestamp"
+              ]
+            }
+          }
+        },
+        "required": [
+          "totalFiatBalance",
+          "fiatCurrency",
+          "wallets",
+          "recentTransactions"
+        ]
+      },
+      "WalletCreateRequest": {
+        "type": "object",
+        "properties": {
+          "blockchain": {
+            "type": "string",
+            "enum": [
+              "celo",
+              "ethereum",
+              "bitcoin",
+              "solana"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "encryptedMnemonic": {
+            "type": "string"
+          },
+          "derivationPath": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "blockchain"
+        ]
+      },
+      "WalletCreateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blockchain": {
+            "type": "string",
+            "enum": [
+              "celo",
+              "ethereum",
+              "bitcoin",
+              "solana"
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "publicKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "balanceCache": {
+            "type": "string",
+            "nullable": true
+          },
+          "balanceFiat": {
+            "type": "number",
+            "nullable": true
+          },
+          "fiatCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "blockchain",
+          "address",
+          "publicKey",
+          "label",
+          "isDefault",
+          "balanceCache",
+          "balanceFiat",
+          "fiatCurrency",
+          "createdAt"
+        ]
+      },
+      "CardCreateRequest": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "brand": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTERCARD"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "virtual",
+              "physical"
+            ]
+          },
+          "spendingLimit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "dailyLimit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "monthlyLimit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "mock",
+              "gnosis",
+              "highnote",
+              "deserve"
+            ]
+          }
+        },
+        "required": [
+          "walletId"
+        ]
+      },
+      "CardUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "frozen",
+              "cancelled"
+            ]
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "isContactless": {
+            "type": "boolean"
+          },
+          "isATM": {
+            "type": "boolean"
+          },
+          "spendingLimit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "dailyLimit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "monthlyLimit": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "CardResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "walletId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nickname": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTERCARD"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "virtual",
+              "physical"
+            ]
+          },
+          "lastFourDigits": {
+            "type": "string"
+          },
+          "cardholderName": {
+            "type": "string"
+          },
+          "expiryMonth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "expiryYear": {
+            "type": "integer"
+          },
+          "spendingLimit": {
+            "type": "number",
+            "nullable": true
+          },
+          "dailyLimit": {
+            "type": "number",
+            "nullable": true
+          },
+          "monthlyLimit": {
+            "type": "number",
+            "nullable": true
+          },
+          "totalSpent": {
+            "type": "number"
+          },
+          "monthlySpent": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "frozen",
+              "cancelled"
+            ]
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "isContactless": {
+            "type": "boolean"
+          },
+          "isATM": {
+            "type": "boolean"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "mock",
+              "gnosis",
+              "highnote",
+              "deserve"
+            ]
+          },
+          "providerCardId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "walletId",
+          "nickname",
+          "brand",
+          "type",
+          "lastFourDigits",
+          "cardholderName",
+          "expiryMonth",
+          "expiryYear",
+          "spendingLimit",
+          "dailyLimit",
+          "monthlyLimit",
+          "totalSpent",
+          "monthlySpent",
+          "status",
+          "isOnline",
+          "isContactless",
+          "isATM",
+          "lastUsedAt",
+          "createdAt",
+          "updatedAt",
+          "provider",
+          "providerCardId"
+        ]
+      },
+      "CardDetailsResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "walletId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nickname": {
+            "type": "string",
+            "nullable": true
+          },
+          "brand": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTERCARD"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "virtual",
+              "physical"
+            ]
+          },
+          "lastFourDigits": {
+            "type": "string"
+          },
+          "cardholderName": {
+            "type": "string"
+          },
+          "expiryMonth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "expiryYear": {
+            "type": "integer"
+          },
+          "spendingLimit": {
+            "type": "number",
+            "nullable": true
+          },
+          "dailyLimit": {
+            "type": "number",
+            "nullable": true
+          },
+          "monthlyLimit": {
+            "type": "number",
+            "nullable": true
+          },
+          "totalSpent": {
+            "type": "number"
+          },
+          "monthlySpent": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "frozen",
+              "cancelled"
+            ]
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "isContactless": {
+            "type": "boolean"
+          },
+          "isATM": {
+            "type": "boolean"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "mock",
+              "gnosis",
+              "highnote",
+              "deserve"
+            ]
+          },
+          "providerCardId": {
+            "type": "string",
+            "nullable": true
+          },
+          "cardNumber": {
+            "type": "string"
+          },
+          "cvv": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "walletId",
+          "nickname",
+          "brand",
+          "type",
+          "lastFourDigits",
+          "cardholderName",
+          "expiryMonth",
+          "expiryYear",
+          "spendingLimit",
+          "dailyLimit",
+          "monthlyLimit",
+          "totalSpent",
+          "monthlySpent",
+          "status",
+          "isOnline",
+          "isContactless",
+          "isATM",
+          "lastUsedAt",
+          "createdAt",
+          "updatedAt",
+          "provider",
+          "providerCardId",
+          "cardNumber",
+          "cvv"
+        ]
+      },
+      "SwapQuoteRequest": {
+        "type": "object",
+        "properties": {
+          "blockchain": {
+            "type": "string",
+            "enum": [
+              "celo",
+              "ethereum",
+              "bitcoin",
+              "solana"
+            ]
+          },
+          "fromToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "toToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d+)?$"
+          }
+        },
+        "required": [
+          "blockchain",
+          "fromToken",
+          "toToken",
+          "amount"
+        ]
+      },
+      "SwapQuoteResponse": {
+        "type": "object",
+        "properties": {
+          "fromToken": {
+            "type": "string"
+          },
+          "toToken": {
+            "type": "string"
+          },
+          "fromAmount": {
+            "type": "string"
+          },
+          "toAmount": {
+            "type": "string"
+          },
+          "estimatedGas": {
+            "type": "string"
+          },
+          "priceImpact": {
+            "type": "number"
+          },
+          "route": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "fromToken",
+          "toToken",
+          "fromAmount",
+          "toAmount"
+        ]
+      },
+      "SwapExecuteRequest": {
+        "type": "object",
+        "properties": {
+          "blockchain": {
+            "type": "string",
+            "enum": [
+              "celo",
+              "ethereum",
+              "bitcoin",
+              "solana"
+            ]
+          },
+          "fromToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "toToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d+)?$"
+          },
+          "walletId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quoteResponse": {
+            "type": "object"
+          },
+          "privateKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "blockchain",
+          "fromToken",
+          "toToken",
+          "amount",
+          "walletId"
+        ]
+      },
+      "SwapExecuteResponse": {
+        "type": "object",
+        "properties": {
+          "txHash": {
+            "type": "string"
+          },
+          "blockchain": {
+            "type": "string",
+            "enum": [
+              "celo",
+              "ethereum",
+              "bitcoin",
+              "solana"
+            ]
+          }
+        },
+        "required": [
+          "txHash",
+          "blockchain"
+        ]
+      },
+      "StakingPositionsResponse": {
+        "type": "object",
+        "properties": {
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "walletId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "blockchain": {
+                  "type": "string",
+                  "enum": [
+                    "celo",
+                    "ethereum",
+                    "bitcoin",
+                    "solana"
+                  ]
+                },
+                "amount": {
+                  "type": "string"
+                },
+                "validatorAddress": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "apr": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "rewards": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "protocol": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "stakedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "userId",
+                "walletId",
+                "blockchain",
+                "amount",
+                "validatorAddress",
+                "apr",
+                "rewards",
+                "status",
+                "protocol",
+                "stakedAt",
+                "createdAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "positions"
+        ]
+      },
+      "StakeRequest": {
+        "type": "object",
+        "properties": {
+          "blockchain": {
+            "type": "string",
+            "enum": [
+              "celo",
+              "ethereum",
+              "bitcoin",
+              "solana"
+            ]
+          },
+          "walletId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d+)?$"
+          },
+          "validatorAddress": {
+            "type": "string"
+          },
+          "privateKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "blockchain",
+          "walletId",
+          "amount",
+          "privateKey"
+        ]
+      },
+      "StakeResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "txHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "txHash"
+        ]
+      },
+      "BudgetSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "totalSpent": {
+                "type": "number"
+              },
+              "totalLimit": {
+                "type": "number",
+                "nullable": true
+              },
+              "remaining": {
+                "type": "number",
+                "nullable": true
+              },
+              "period": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "totalSpent",
+              "totalLimit",
+              "remaining",
+              "period"
+            ]
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "limitType": {
+                  "type": "string",
+                  "enum": [
+                    "daily",
+                    "weekly",
+                    "monthly",
+                    "category"
+                  ]
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "currentSpent": {
+                  "type": "number"
+                },
+                "walletId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "cardId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "category": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "limitType",
+                "amount",
+                "currentSpent",
+                "walletId",
+                "cardId",
+                "category"
+              ]
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "limits"
+        ]
+      },
+      "CreateSpendingLimitRequest": {
+        "type": "object",
+        "properties": {
+          "limitType": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "category"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "walletId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cardId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "limitType",
+          "amount"
+        ]
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "actionUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "actionLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "type",
+          "title",
+          "body",
+          "channels",
+          "status",
+          "priority",
+          "actionUrl",
+          "actionLabel",
+          "sentAt",
+          "deliveredAt",
+          "readAt",
+          "createdAt"
+        ]
+      },
+      "NotificationMarkAsReadRequest": {
+        "type": "object",
+        "properties": {
+          "notificationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "notificationIds"
+        ]
+      },
+      "HealthCheckResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "unhealthy"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "healthy",
+                      "unhealthy"
+                    ]
+                  },
+                  "latency": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "latency"
+                ]
+              },
+              "redis": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "healthy",
+                      "unhealthy"
+                    ]
+                  },
+                  "latency": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "latency"
+                ]
+              },
+              "msal": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "healthy",
+                      "unhealthy"
+                    ]
+                  },
+                  "configured": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "status",
+                  "configured"
+                ]
+              }
+            },
+            "required": [
+              "database",
+              "redis",
+              "msal"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "timestamp",
+          "services"
+        ]
+      },
+      "EnvDiagnosticsResponse": {
+        "type": "object",
+        "properties": {
+          "nodeEnv": {
+            "type": "string"
+          },
+          "nextVersion": {
+            "type": "string"
+          },
+          "databaseConfigured": {
+            "type": "boolean"
+          },
+          "redisConfigured": {
+            "type": "boolean"
+          },
+          "msalConfigured": {
+            "type": "boolean"
+          },
+          "azureKeyVaultConfigured": {
+            "type": "boolean"
+          },
+          "appInsightsConfigured": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "nodeEnv",
+          "nextVersion",
+          "databaseConfigured",
+          "redisConfigured",
+          "msalConfigured",
+          "azureKeyVaultConfigured",
+          "appInsightsConfigured"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "message"
+                  ]
+                }
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "fields",
+              "timestamp"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    }
+  }
+}

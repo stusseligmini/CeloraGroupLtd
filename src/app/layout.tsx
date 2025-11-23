@@ -4,6 +4,7 @@ import { AuthProvider } from '../providers/AuthProvider'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration'
 import { TelemetryProvider } from '../components/TelemetryProvider'
+import { TelegramMiniAppProvider } from '../components/telegram/TelegramMiniAppProvider'
 import { headers } from 'next/headers'
 import { CspNonceProvider } from '../lib/cspHelpers'
 
@@ -64,7 +65,9 @@ export default async function RootLayout({
       <body className="min-h-screen bg-slate-900 antialiased">
         <TelemetryProvider>
           <ErrorBoundary>
-            <AuthProvider>{children}</AuthProvider>
+            <TelegramMiniAppProvider>
+              <AuthProvider>{children}</AuthProvider>
+            </TelegramMiniAppProvider>
           </ErrorBoundary>
           <ServiceWorkerRegistration />
         </TelemetryProvider>

@@ -13,12 +13,13 @@ export interface CspConfig {
 }
 
 /**
- * Generate cryptographically secure nonce for CSP
+ * Generate cryptographically secure nonce for CSP (Edge Runtime compatible)
  */
 export function generateCspNonce(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  return Buffer.from(array).toString('base64');
+  // Convert to base64 without Buffer (Edge Runtime compatible)
+  return btoa(String.fromCharCode(...array));
 }
 
 /**

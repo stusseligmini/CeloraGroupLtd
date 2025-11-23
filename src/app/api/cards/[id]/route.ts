@@ -10,6 +10,8 @@ import { CardUpdateRequestSchema } from '@/lib/validation/schemas';
 import { decrypt, getLastFourDigits } from '@/lib/security/encryption';
 import { logError } from '@/lib/logger';
 import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
+import { ensureProvidersInitialized, getProvider, isProviderAvailable } from '@/server/services/cardIssuing/factory';
+import type { CardProvider, CardDetails as ProviderCardDetails } from '@/server/services/cardIssuing/types';
 
 const prisma = new PrismaClient();
 
@@ -32,9 +34,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Check if full details requested (requires additional auth)
-    const showFullDetails = request.nextUrl.searchParams.get('full') === 'true';
-
     const card = await prisma.card.findFirst({
       where: { id, userId },
     });
@@ -46,39 +45,59 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
+    await ensureProvidersInitialized();
+
+    let providerCardData: ProviderCardDetails | null = null;
+    if (
+      card.provider &&
+      card.providerCardId &&
+      isProviderAvailable(card.provider as CardProvider)
+    ) {
+      try {
+        const provider = getProvider(card.provider as CardProvider);
+        const result = await provider.getCard(card.providerCardId, userId);
+        if (result.success && result.data) {
+          providerCardData = result.data as ProviderCardDetails;
+        }
+      } catch (error) {
+        logError('Failed to sync card with provider', error);
+      }
+    }
+
+    const decryptedNumber = providerCardData?.cardNumber || decrypt(card.encryptedNumber);
+
     // Build response based on detail level
-    let cardResponse: any = {
+    const cardResponse: any = {
       id: card.id,
       userId: card.userId,
       walletId: card.walletId,
-      nickname: card.nickname,
-      brand: card.brand,
-      type: card.type,
-      lastFourDigits: getLastFourDigits(decrypt(card.encryptedNumber)),
-      cardholderName: card.cardholderName,
-      expiryMonth: card.expiryMonth,
-      expiryYear: card.expiryYear,
+      nickname: providerCardData?.nickname ?? card.nickname,
+      brand: providerCardData?.brand ?? card.brand,
+      type: providerCardData?.type ?? card.type,
+      lastFourDigits: providerCardData?.lastFourDigits ?? getLastFourDigits(decryptedNumber),
+      cardholderName: providerCardData?.cardholderName ?? card.cardholderName,
+      expiryMonth: providerCardData?.expiryMonth ?? card.expiryMonth,
+      expiryYear: providerCardData?.expiryYear ?? card.expiryYear,
       spendingLimit: card.spendingLimit ? Number(card.spendingLimit) : null,
       dailyLimit: card.dailyLimit ? Number(card.dailyLimit) : null,
       monthlyLimit: card.monthlyLimit ? Number(card.monthlyLimit) : null,
       totalSpent: Number(card.totalSpent),
       monthlySpent: Number(card.monthlySpent),
-      status: card.status,
-      isOnline: card.isOnline,
-      isContactless: card.isContactless,
-      isATM: card.isATM,
+      status: providerCardData?.status ?? card.status,
+      isOnline: providerCardData?.isOnline ?? card.isOnline,
+      isContactless: providerCardData?.isContactless ?? card.isContactless,
+      isATM: providerCardData?.isATM ?? card.isATM,
       lastUsedAt: card.lastUsedAt?.toISOString() || null,
       createdAt: card.createdAt.toISOString(),
       updatedAt: card.updatedAt.toISOString(),
       activatedAt: card.activatedAt?.toISOString() || null,
+      provider: card.provider,
+      providerCardId: card.providerCardId,
     };
 
-    // Add full details if requested and authorized
-    if (showFullDetails) {
-      // In production: verify additional security (2FA, recent auth, etc.)
-      cardResponse.cardNumber = decrypt(card.encryptedNumber);
-      cardResponse.cvv = decrypt(card.encryptedCVV);
-    }
+    // CVV is NEVER retrievable (PCI DSS compliance)
+    // Card number can be decrypted for authorized requests if needed for display
+    // Full card number should only be shown with additional security (2FA, biometric, etc.)
 
     return NextResponse.json(
       ApiResponseHelper.success({ card: cardResponse }),
@@ -132,12 +151,38 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    await ensureProvidersInitialized();
+
+    if (
+      existingCard.provider &&
+      existingCard.providerCardId &&
+      isProviderAvailable(existingCard.provider as CardProvider)
+    ) {
+      const provider = getProvider(existingCard.provider as CardProvider);
+      const providerResult = await provider.updateCard(
+        existingCard.providerCardId,
+        userId,
+        validation.data
+      );
+      if (!providerResult.success) {
+        return NextResponse.json(
+          ApiResponseHelper.error(
+            providerResult.error || 'Failed to update card via provider',
+            'CARD_PROVIDER_ERROR'
+          ),
+          { status: HttpStatusCode.BAD_GATEWAY }
+        );
+      }
+    }
+
     // Update card
     const updatedCard = await prisma.card.update({
       where: { id },
       data: {
         ...validation.data,
         cancelledAt: validation.data.status === 'cancelled' ? new Date() : existingCard.cancelledAt,
+        providerStatus: validation.data.status ?? existingCard.providerStatus,
+        lastUsedAt: new Date(),
       },
     });
 
@@ -168,6 +213,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           updatedAt: updatedCard.updatedAt.toISOString(),
           activatedAt: updatedCard.activatedAt?.toISOString() || null,
           cancelledAt: updatedCard.cancelledAt?.toISOString() || null,
+          provider: updatedCard.provider,
+          providerCardId: updatedCard.providerCardId,
         },
       }, 'Card updated successfully'),
       { status: HttpStatusCode.OK }
@@ -209,12 +256,33 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
+    await ensureProvidersInitialized();
+
+    if (
+      card.provider &&
+      card.providerCardId &&
+      isProviderAvailable(card.provider as CardProvider)
+    ) {
+      const provider = getProvider(card.provider as CardProvider);
+      const providerResult = await provider.cancelCard(card.providerCardId, userId);
+      if (!providerResult.success) {
+        return NextResponse.json(
+          ApiResponseHelper.error(
+            providerResult.error || 'Failed to cancel card via provider',
+            'CARD_PROVIDER_ERROR'
+          ),
+          { status: HttpStatusCode.BAD_GATEWAY }
+        );
+      }
+    }
+
     // Soft delete: set status to cancelled
     await prisma.card.update({
       where: { id },
       data: {
         status: 'cancelled',
         cancelledAt: new Date(),
+        providerStatus: 'cancelled',
       },
     });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Workbox } from 'workbox-window';
+import { logger } from '@/lib/logger';
 
 export default function ServiceWorkerRegistration() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -61,7 +62,7 @@ export default function ServiceWorkerRegistration() {
       }, 60 * 1000);
       
     } catch (error) {
-      console.error('[SW] Registration failed:', error);
+      logger.error('Service worker registration failed', error instanceof Error ? error : undefined);
     }
   };
   

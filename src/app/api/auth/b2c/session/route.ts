@@ -1,7 +1,7 @@
 /**
- * Azure B2C Session API
+ * Firebase Session API
  * 
- * Manages session cookies for MSAL authentication.
+ * Manages session cookies for Firebase authentication.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,11 +13,11 @@ import {
   errorResponse,
   successResponse,
 } from '@/lib/validation/validate';
-import { extractUserInfo } from '@/lib/jwtUtils';
+import { verifyIdToken } from '@/lib/firebase/admin';
+import { logger } from '@/lib/logger';
 
-const ACCESS_TOKEN_COOKIE = 'auth-token';
-const ID_TOKEN_COOKIE = 'auth-id-token';
-const REFRESH_TOKEN_COOKIE = 'auth-refresh-token';
+const ID_TOKEN_COOKIE = 'firebase-id-token';
+const AUTH_TOKEN_COOKIE = 'firebase-auth-token';
 
 const cookieOptions = {
   httpOnly: true,
@@ -33,22 +33,36 @@ export async function POST(request: NextRequest) {
     // Validate request body
     const body = await validateBody(request, SessionRequestSchema);
 
-    // Calculate expiration
-    const expiresAt = new Date(Date.now() + body.expiresIn * 1000);
-
-    // Extract user info from ID token (preferred) or access token
-    const tokenToExtract = body.idToken || body.accessToken;
-    const userInfo = extractUserInfo(tokenToExtract);
-
-    if (!userInfo) {
+    // Verify Firebase ID token
+    const idToken = body.idToken || body.accessToken;
+    if (!idToken) {
       return errorResponse(
         'INVALID_TOKEN',
-        'Failed to extract user information from token',
+        'ID token is required',
         400,
         undefined,
         requestId
       );
     }
+
+    // Verify Firebase ID token
+    let decodedToken;
+    try {
+      decodedToken = await verifyIdToken(idToken);
+    } catch (error) {
+      return errorResponse(
+        'INVALID_TOKEN',
+        'Failed to verify Firebase ID token',
+        401,
+        undefined,
+        requestId
+      );
+    }
+
+    // Calculate expiration from token
+    const expiresAt = decodedToken.exp 
+      ? new Date(decodedToken.exp * 1000)
+      : new Date(Date.now() + 3600 * 1000); // Default 1 hour
 
     // Set cookies
     const response = NextResponse.json(
@@ -57,31 +71,24 @@ export async function POST(request: NextRequest) {
         sessionId: requestId,
         expiresAt: expiresAt.toISOString(),
         user: {
-          id: userInfo.id,
-          email: userInfo.email,
-          displayName: userInfo.name || null,
+          id: decodedToken.uid,
+          email: decodedToken.email || null,
+          displayName: decodedToken.name || null,
         },
       })
     );
 
-    response.cookies.set(ACCESS_TOKEN_COOKIE, body.accessToken, {
+    // Set Firebase ID token cookie
+    response.cookies.set(ID_TOKEN_COOKIE, idToken, {
       ...cookieOptions,
       expires: expiresAt,
     });
 
-    if (body.refreshToken) {
-      response.cookies.set(REFRESH_TOKEN_COOKIE, body.refreshToken, {
-        ...cookieOptions,
-        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      });
-    }
-
-    if (body.idToken) {
-      response.cookies.set(ID_TOKEN_COOKIE, body.idToken, {
-        ...cookieOptions,
-        expires: expiresAt,
-      });
-    }
+    // Also set as auth-token for compatibility
+    response.cookies.set(AUTH_TOKEN_COOKIE, idToken, {
+      ...cookieOptions,
+      expires: expiresAt,
+    });
 
     return response;
   } catch (error) {
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
       return validationErrorResponse(error, requestId);
     }
 
-    console.error('[Session POST Error]', error);
+    logger.error('Session POST error', error, { requestId });
     return errorResponse(
       'SESSION_CREATE_FAILED',
       'Failed to create session',
@@ -110,23 +117,19 @@ export async function DELETE() {
       requestId
     );
 
-    // Clear all auth cookies
-    response.cookies.set(ACCESS_TOKEN_COOKIE, '', {
-      ...cookieOptions,
-      maxAge: 0,
-    });
+    // Clear all Firebase auth cookies
     response.cookies.set(ID_TOKEN_COOKIE, '', {
       ...cookieOptions,
       maxAge: 0,
     });
-    response.cookies.set(REFRESH_TOKEN_COOKIE, '', {
+    response.cookies.set(AUTH_TOKEN_COOKIE, '', {
       ...cookieOptions,
       maxAge: 0,
     });
 
     return response;
   } catch (error) {
-    console.error('[Session DELETE Error]', error);
+    logger.error('Session DELETE error', error, { requestId });
     return errorResponse(
       'SESSION_DELETE_FAILED',
       'Failed to clear session',

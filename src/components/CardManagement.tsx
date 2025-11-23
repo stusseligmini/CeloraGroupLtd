@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { VirtualCard, CardDetails } from '@/types/api';
+import { logger } from '@/lib/logger';
 
 interface CardManagementProps {
   walletId?: string;
@@ -53,7 +54,7 @@ export function CardManagement({ walletId }: CardManagementProps) {
         setCards(data.data.cards);
       }
     } catch (error) {
-      console.error('Failed to load cards:', error);
+      logger.error('Failed to load cards', error instanceof Error ? error : undefined, { walletId });
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export function CardManagement({ walletId }: CardManagementProps) {
         });
       }
     } catch (error) {
-      console.error('Failed to create card:', error);
+      logger.error('Failed to create card', error instanceof Error ? error : undefined, { walletId });
     } finally {
       setLoading(false);
     }
@@ -110,7 +111,7 @@ export function CardManagement({ walletId }: CardManagementProps) {
         setShowDetails(true);
       }
     } catch (error) {
-      console.error('Failed to load card details:', error);
+      logger.error('Failed to load card details', error instanceof Error ? error : undefined);
     }
   };
 
@@ -129,7 +130,7 @@ export function CardManagement({ walletId }: CardManagementProps) {
         await loadCards();
       }
     } catch (error) {
-      console.error('Failed to freeze card:', error);
+      logger.error('Failed to freeze card', error instanceof Error ? error : undefined, { cardId });
     }
   };
 
@@ -148,7 +149,7 @@ export function CardManagement({ walletId }: CardManagementProps) {
         await loadCards();
       }
     } catch (error) {
-      console.error('Failed to unfreeze card:', error);
+      logger.error('Failed to unfreeze card', error instanceof Error ? error : undefined, { cardId });
     }
   };
 
@@ -167,7 +168,7 @@ export function CardManagement({ walletId }: CardManagementProps) {
         await loadCards();
       }
     } catch (error) {
-      console.error('Failed to cancel card:', error);
+      logger.error('Failed to cancel card', error instanceof Error ? error : undefined, { cardId });
     }
   };
 

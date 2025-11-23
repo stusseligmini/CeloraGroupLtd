@@ -65,7 +65,11 @@ class ErrorBoundary extends Component<Props, State> {
         );
       }
     } catch (loggerError) {
-      console.error('[ErrorBoundary] Logger failed:', loggerError);
+      // Fallback: if logger itself fails, use console as last resort
+      // This is acceptable since it's a critical error handling path
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('[ErrorBoundary] Logger failed:', loggerError);
+      }
     }
     
     // Call custom error handler if provided

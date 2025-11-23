@@ -8,6 +8,7 @@
 
 import { useEffect } from 'react';
 import { initializeAppInsights } from '@/lib/telemetry/appInsights';
+import { logger } from '@/lib/logger';
 
 export function TelemetryProvider({ children }: { children: React.ReactNode }) {
   // Initialize Application Insights on mount
@@ -15,7 +16,7 @@ export function TelemetryProvider({ children }: { children: React.ReactNode }) {
     const appInsights = initializeAppInsights();
     
     if (appInsights) {
-      console.log('[TelemetryProvider] Application Insights initialized');
+      logger.info('Application Insights initialized');
     }
   }, []);
 

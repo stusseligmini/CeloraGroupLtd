@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fix workspace root detection warning
+  outputFileTracingRoot: __dirname,
+  
   // Image optimization configuration
   images: {
     remotePatterns: [

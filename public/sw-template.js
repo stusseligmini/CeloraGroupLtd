@@ -27,8 +27,25 @@ if (workbox) {
   // =====================================================================
   
   // Cache API responses with NetworkFirst strategy
+  // Exclude sensitive endpoints (auth, wallet, payments)
   workbox.routing.registerRoute(
-    ({ url }) => url.pathname.startsWith('/api/'),
+    ({ url }) => {
+      const path = url.pathname;
+      // Only cache safe, public API endpoints
+      if (!path.startsWith('/api/')) return false;
+      
+      // Exclude sensitive endpoints
+      const excludePaths = [
+        '/api/auth/',
+        '/api/wallet/',
+        '/api/payment-requests/',
+        '/api/telegram/',
+        '/api/cards/',
+        '/api/multisig/',
+      ];
+      
+      return !excludePaths.some(exclude => path.startsWith(exclude));
+    },
     new workbox.strategies.NetworkFirst({
       cacheName: 'celora-api-cache',
       plugins: [
@@ -39,6 +56,16 @@ if (workbox) {
         new workbox.cacheableResponse.CacheableResponsePlugin({
           statuses: [0, 200],
         }),
+        // Respect Cache-Control: no-store
+        {
+          cacheWillUpdate: async ({ response }) => {
+            const cacheControl = response.headers.get('Cache-Control');
+            if (cacheControl && cacheControl.includes('no-store')) {
+              return null; // Don't cache
+            }
+            return response;
+          },
+        },
       ],
       networkTimeoutSeconds: 10,
     })
@@ -182,11 +209,23 @@ if (workbox) {
     maxRetentionTime: 24 * 60, // Retry for up to 24 hours (in minutes)
   });
   
-  // Register background sync for API POST requests
+  // Register background sync for API POST requests (exclude auth/sensitive endpoints)
   workbox.routing.registerRoute(
-    ({ url, request }) => 
-      url.pathname.startsWith('/api/') && 
-      (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH'),
+    ({ url, request }) => {
+      const path = url.pathname;
+      if (!path.startsWith('/api/')) return false;
+      if (!['POST', 'PUT', 'PATCH'].includes(request.method)) return false;
+      
+      // Exclude sensitive mutations
+      const excludePaths = [
+        '/api/auth/',
+        '/api/wallet/vault',
+        '/api/cards/authorize',
+        '/api/payment-requests/',
+      ];
+      
+      return !excludePaths.some(exclude => path.startsWith(exclude));
+    },
     new workbox.strategies.NetworkOnly({
       plugins: [bgSyncPlugin],
     }),

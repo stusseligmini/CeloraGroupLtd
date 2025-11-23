@@ -2,20 +2,26 @@
  * CSRF (Cross-Site Request Forgery) Protection
  * 
  * Production-ready CSRF protection with double-submit cookie pattern.
+ * Uses Web Crypto API for Edge Runtime compatibility.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { randomBytes, timingSafeEqual } from 'crypto';
 
 export const CSRF_TOKEN_COOKIE = 'celora-csrf-token';
 export const CSRF_TOKEN_HEADER = 'x-csrf-token';
 export const CSRF_TOKEN_PARAM = 'csrf_token';
 
 /**
- * Generate cryptographically secure CSRF token
+ * Generate cryptographically secure CSRF token using Web Crypto API
  */
 export function generateCsrfToken(): string {
-  return randomBytes(32).toString('base64url');
+  const buffer = new Uint8Array(32);
+  crypto.getRandomValues(buffer);
+  // Convert to base64url
+  return btoa(String.fromCharCode(...buffer))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 }
 
 /**
@@ -25,13 +31,12 @@ function compareTokens(token1: string, token2: string): boolean {
   if (!token1 || !token2) return false;
   if (token1.length !== token2.length) return false;
   
-  try {
-    const buffer1 = Buffer.from(token1);
-    const buffer2 = Buffer.from(token2);
-    return timingSafeEqual(buffer1, buffer2);
-  } catch {
-    return false;
+  // Use constant-time comparison
+  let mismatch = 0;
+  for (let i = 0; i < token1.length; i++) {
+    mismatch |= token1.charCodeAt(i) ^ token2.charCodeAt(i);
   }
+  return mismatch === 0;
 }
 
 /**

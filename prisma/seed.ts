@@ -236,12 +236,158 @@ async function main() {
 
   console.log('✅ Created notifications\n');
 
+  // Create virtual cards
+  console.log('💳 Creating virtual cards...');
+  
+  const { encrypt } = await import('../src/lib/security/encryption');
+  const cardNumber1 = '4532123456789012';
+  const cardNumber2 = '5555123456789010';
+  
+  const card1 = await prisma.card.create({
+    data: {
+      userId: user1.id,
+      walletId: celoWallet.id,
+      encryptedNumber: encrypt(cardNumber1),
+      cardholderName: 'ALICE JOHNSON',
+      expiryMonth: 12,
+      expiryYear: 2027,
+      nickname: 'Daily Spending',
+      brand: 'VISA',
+      type: 'virtual',
+      spendingLimit: 1000.00,
+      dailyLimit: 200.00,
+      monthlyLimit: 500.00,
+      status: 'active',
+      isOnline: true,
+      isContactless: true,
+      provider: 'mock',
+      activatedAt: new Date(Date.now() - 7 * 86400000), // 7 days ago
+    },
+  });
+
+  const card2 = await prisma.card.create({
+    data: {
+      userId: user2.id,
+      walletId: btcWallet.id,
+      encryptedNumber: encrypt(cardNumber2),
+      cardholderName: 'BOB SMITH',
+      expiryMonth: 6,
+      expiryYear: 2026,
+      nickname: 'Travel Card',
+      brand: 'MASTERCARD',
+      type: 'virtual',
+      spendingLimit: 5000.00,
+      dailyLimit: 500.00,
+      monthlyLimit: 2000.00,
+      status: 'active',
+      isOnline: true,
+      isContactless: true,
+      provider: 'mock',
+      activatedAt: new Date(Date.now() - 30 * 86400000), // 30 days ago
+    },
+  });
+
+  console.log(`✅ Created ${2} cards\n`);
+
+  // Create payment requests
+  console.log('💸 Creating payment requests...');
+  
+  await prisma.paymentRequest.createMany({
+    data: [
+      {
+        senderId: user1.id,
+        receiverId: user2.id,
+        amount: '1000000000000000000', // 1 CELO
+        blockchain: 'celo',
+        tokenSymbol: 'CELO',
+        memo: 'Lunch money',
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 86400000), // 7 days
+      },
+      {
+        senderId: user2.id,
+        receiverId: user1.id,
+        amount: '500000000000000000', // 0.5 ETH
+        blockchain: 'ethereum',
+        tokenSymbol: 'ETH',
+        memo: 'Thanks for the help!',
+        status: 'fulfilled',
+        fulfilledAt: new Date(Date.now() - 2 * 86400000),
+        expiresAt: new Date(Date.now() + 5 * 86400000),
+      },
+    ],
+  });
+
+  console.log('✅ Created payment requests\n');
+
+  // Create staking positions
+  console.log('📈 Creating staking positions...');
+  
+  await prisma.stakingPosition.createMany({
+    data: [
+      {
+        userId: user1.id,
+        walletId: celoWallet.id,
+        blockchain: 'celo',
+        amount: '2000000000000000000', // 2 CELO staked
+        apr: 5.5,
+        rewards: '110000000000000000', // 0.11 CELO rewards
+        status: 'active',
+        protocol: 'native',
+        stakedAt: new Date(Date.now() - 30 * 86400000),
+      },
+      {
+        userId: user2.id,
+        walletId: solWallet.id,
+        blockchain: 'solana',
+        amount: '50000000000', // 50 SOL staked
+        apr: 7.2,
+        rewards: '3000000000', // 3 SOL rewards
+        status: 'active',
+        protocol: 'native',
+        stakedAt: new Date(Date.now() - 60 * 86400000),
+      },
+    ],
+  });
+
+  console.log('✅ Created staking positions\n');
+
+  // Create user contacts
+  console.log('📇 Creating user contacts...');
+  
+  await prisma.userContact.createMany({
+    data: [
+      {
+        userId: user1.id,
+        contactType: 'username',
+        contactValue: 'bob',
+        displayName: 'Bob Smith',
+        resolvedAddress: btcWallet.address,
+        resolvedBlockchain: 'bitcoin',
+      },
+      {
+        userId: user2.id,
+        contactType: 'phone',
+        contactValue: '+4798765432',
+        displayName: 'Alice Johnson',
+        resolvedAddress: celoWallet.address,
+        resolvedBlockchain: 'celo',
+      },
+    ],
+  });
+
+  console.log('✅ Created user contacts\n');
+
   console.log('✨ Seed completed successfully!');
   console.log('\n📋 Summary:');
   console.log(`   Users: 2`);
   console.log(`   Wallets: 4`);
   console.log(`   Transactions: ${transactions.count}`);
   console.log(`   Notifications: 3`);
+  console.log(`   Cards: 2`);
+  console.log(`   Payment Requests: 2`);
+  console.log(`   Staking Positions: 2`);
+  console.log(`   Contacts: 2`);
   console.log('\n🎉 Database is ready for development!');
 }
 

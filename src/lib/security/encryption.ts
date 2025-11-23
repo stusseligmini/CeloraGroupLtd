@@ -4,6 +4,7 @@
  */
 
 import crypto from 'crypto';
+import { getSecret } from '@/lib/config/secrets';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32; // 256 bits
@@ -11,26 +12,69 @@ const IV_LENGTH = 16; // 128 bits
 const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 64;
 
+let encryptionKeyCache: Buffer | null = null;
+
 /**
- * Get encryption key from environment or generate
+ * Get encryption key from Key Vault or environment
  */
-function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
+async function getEncryptionKey(): Promise<Buffer> {
+  if (encryptionKeyCache) {
+    return encryptionKeyCache;
+  }
+
+  let key: string;
+  
+  try {
+    // Try Key Vault first
+    key = await getSecret('card-encryption-key', 'ENCRYPTION_KEY');
+  } catch {
+    // Fallback to environment variable
+    key = process.env.ENCRYPTION_KEY || '';
+  }
   
   if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable not set');
+    throw new Error('ENCRYPTION_KEY not found in Key Vault or environment');
   }
   
   // Derive key using PBKDF2
   const salt = process.env.ENCRYPTION_SALT || 'celora-salt-v1';
-  return crypto.pbkdf2Sync(key, salt, 100000, KEY_LENGTH, 'sha512');
+  encryptionKeyCache = crypto.pbkdf2Sync(key, salt, 100000, KEY_LENGTH, 'sha512');
+  
+  return encryptionKeyCache;
+}
+
+/**
+ * Synchronous version for backward compatibility
+ * WARNING: Only use in dev - will throw in production without pre-warmed cache
+ */
+function getEncryptionKeySync(): Buffer {
+  if (encryptionKeyCache) {
+    return encryptionKeyCache;
+  }
+
+  const key = process.env.ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error('ENCRYPTION_KEY not available. Call warmEncryptionCache() first in production.');
+  }
+  
+  const salt = process.env.ENCRYPTION_SALT || 'celora-salt-v1';
+  encryptionKeyCache = crypto.pbkdf2Sync(key, salt, 100000, KEY_LENGTH, 'sha512');
+  
+  return encryptionKeyCache;
+}
+
+/**
+ * Pre-warm encryption key cache (call at app startup)
+ */
+export async function warmEncryptionCache(): Promise<void> {
+  await getEncryptionKey();
 }
 
 /**
  * Encrypt data using AES-256-GCM
  */
 export function encrypt(plaintext: string): string {
-  const key = getEncryptionKey();
+  const key = getEncryptionKeySync();
   const iv = crypto.randomBytes(IV_LENGTH);
   
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -48,7 +92,7 @@ export function encrypt(plaintext: string): string {
  * Decrypt data using AES-256-GCM
  */
 export function decrypt(ciphertext: string): string {
-  const key = getEncryptionKey();
+  const key = getEncryptionKeySync();
   
   const parts = ciphertext.split(':');
   if (parts.length !== 3) {

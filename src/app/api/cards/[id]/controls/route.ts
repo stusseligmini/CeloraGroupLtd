@@ -5,9 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { ApiResponseHelper, HttpStatusCode } from '@/types/api';
 import { logError } from '@/lib/logger';
-import { z } from 'zod';
+import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
+import { CardControlsUpdateSchema, CardControlsMCCActionSchema, CardControlsResponseSchema, IdParamSchema } from '@/lib/validation/schemas';
+import { validateBody, validateParams, ValidationError, validationErrorResponse, errorResponse, successResponse } from '@/lib/validation/validate';
 
 const prisma = new PrismaClient();
 
@@ -15,42 +16,23 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-// Validation schemas
-const UpdateControlsSchema = z.object({
-  allowedMCC: z.array(z.string()).optional(),
-  blockedMCC: z.array(z.string()).optional(),
-  allowedCountries: z.array(z.string().length(2)).optional(),
-  blockedCountries: z.array(z.string().length(2)).optional(),
-  cashbackRate: z.number().min(0).max(0.2).optional(), // Max 20%
-  isOnline: z.boolean().optional(),
-  isContactless: z.boolean().optional(),
-  isATM: z.boolean().optional(),
-});
-
 /**
  * PATCH /api/cards/[id]/controls - Update advanced card controls
  */
 export async function PATCH(request: NextRequest, context: RouteContext) {
+  const requestId = crypto.randomUUID();
+  
   try {
-    const { id } = await context.params;
+    const params = await context.params;
+    const { id } = validateParams(params, IdParamSchema);
     
-    const userId = request.headers.get('x-user-id');
+    const userId = getUserIdFromRequest(request);
     if (!userId) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
-        { status: HttpStatusCode.UNAUTHORIZED }
-      );
+      return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
 
-    const body = await request.json();
-    const validation = UpdateControlsSchema.safeParse(body);
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Invalid request body', 'VALIDATION_ERROR', validation.error.flatten()),
-        { status: HttpStatusCode.BAD_REQUEST }
-      );
-    }
+    // Validate request body
+    const body = await validateBody(request, CardControlsUpdateSchema);
 
     // Verify card ownership
     const card = await prisma.card.findFirst({
@@ -67,31 +49,32 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Update controls
     const updatedCard = await prisma.card.update({
       where: { id },
-      data: validation.data,
+      data: body,
     });
 
-    return NextResponse.json(
-      ApiResponseHelper.success({
-        controls: {
-          allowedMCC: updatedCard.allowedMCC,
-          blockedMCC: updatedCard.blockedMCC,
-          allowedCountries: updatedCard.allowedCountries,
-          blockedCountries: updatedCard.blockedCountries,
-          cashbackRate: updatedCard.cashbackRate ? Number(updatedCard.cashbackRate) : 0.02,
-          isOnline: updatedCard.isOnline,
-          isContactless: updatedCard.isContactless,
-          isATM: updatedCard.isATM,
-        },
-      }, 'Card controls updated'),
-      { status: HttpStatusCode.OK }
-    );
+    // Validate response
+    const validatedResponse = CardControlsResponseSchema.parse({
+      controls: {
+        allowedMCC: updatedCard.allowedMCC,
+        blockedMCC: updatedCard.blockedMCC,
+        allowedCountries: updatedCard.allowedCountries,
+        blockedCountries: updatedCard.blockedCountries,
+        cashbackRate: updatedCard.cashbackRate ? Number(updatedCard.cashbackRate) : 0.02,
+        isOnline: updatedCard.isOnline,
+        isContactless: updatedCard.isContactless,
+        isATM: updatedCard.isATM,
+      },
+    });
+
+    return successResponse(validatedResponse, 200, requestId);
 
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return validationErrorResponse(error, requestId);
+    }
+    
     logError('Failed to update card controls', error);
-    return NextResponse.json(
-      ApiResponseHelper.error('Internal server error', 'INTERNAL_ERROR'),
-      { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
-    );
+    return errorResponse('INTERNAL_SERVER_ERROR', 'Failed to update card controls', 500, process.env.NODE_ENV === 'development' ? error : undefined, requestId);
   }
 }
 
@@ -99,15 +82,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  * GET /api/cards/[id]/controls - Get current card controls
  */
 export async function GET(request: NextRequest, context: RouteContext) {
+  const requestId = crypto.randomUUID();
+  
   try {
-    const { id } = await context.params;
+    const params = await context.params;
+    const { id } = validateParams(params, IdParamSchema);
     
-    const userId = request.headers.get('x-user-id');
+    const userId = getUserIdFromRequest(request);
     if (!userId) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
-        { status: HttpStatusCode.UNAUTHORIZED }
-      );
+      return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
 
     const card = await prisma.card.findFirst({
@@ -127,36 +110,34 @@ export async function GET(request: NextRequest, context: RouteContext) {
     });
 
     if (!card) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Card not found', 'NOT_FOUND'),
-        { status: HttpStatusCode.NOT_FOUND }
-      );
+      return errorResponse('NOT_FOUND', 'Card not found', 404, undefined, requestId);
     }
 
-    return NextResponse.json(
-      ApiResponseHelper.success({
-        controls: {
-          allowedMCC: card.allowedMCC,
-          blockedMCC: card.blockedMCC,
-          allowedCountries: card.allowedCountries,
-          blockedCountries: card.blockedCountries,
-          cashbackRate: card.cashbackRate ? Number(card.cashbackRate) : 0.02,
-          isOnline: card.isOnline,
-          isContactless: card.isContactless,
-          isATM: card.isATM,
-          isDisposable: card.isDisposable,
-          autoFreezeRules: card.autoFreezeRules,
-        },
-      }),
-      { status: HttpStatusCode.OK }
-    );
+    // Validate response
+    const validatedResponse = CardControlsResponseSchema.parse({
+      controls: {
+        allowedMCC: card.allowedMCC,
+        blockedMCC: card.blockedMCC,
+        allowedCountries: card.allowedCountries,
+        blockedCountries: card.blockedCountries,
+        cashbackRate: card.cashbackRate ? Number(card.cashbackRate) : 0.02,
+        isOnline: card.isOnline,
+        isContactless: card.isContactless,
+        isATM: card.isATM,
+        isDisposable: card.isDisposable,
+        autoFreezeRules: card.autoFreezeRules,
+      },
+    });
+
+    return successResponse(validatedResponse, 200, requestId);
 
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return validationErrorResponse(error, requestId);
+    }
+    
     logError('Failed to get card controls', error);
-    return NextResponse.json(
-      ApiResponseHelper.error('Internal server error', 'INTERNAL_ERROR'),
-      { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
-    );
+    return errorResponse('INTERNAL_SERVER_ERROR', 'Failed to get card controls', 500, process.env.NODE_ENV === 'development' ? error : undefined, requestId);
   }
 }
 
@@ -164,46 +145,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
  * POST /api/cards/[id]/controls/block-mcc - Quick block merchant category
  */
 export async function POST(request: NextRequest, context: RouteContext) {
+  const requestId = crypto.randomUUID();
+  
   try {
-    const { id } = await context.params;
+    const params = await context.params;
+    const { id } = validateParams(params, IdParamSchema);
     
-    const userId = request.headers.get('x-user-id');
+    const userId = getUserIdFromRequest(request);
     if (!userId) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
-        { status: HttpStatusCode.UNAUTHORIZED }
-      );
+      return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
 
-    const body = await request.json();
-    const { mccCodes, action } = body; // action: 'block' | 'allow'
-
-    if (!Array.isArray(mccCodes) || mccCodes.length === 0) {
-      return NextResponse.json(
-        ApiResponseHelper.error('mccCodes must be a non-empty array', 'VALIDATION_ERROR'),
-        { status: HttpStatusCode.BAD_REQUEST }
-      );
-    }
+    // Validate request body
+    const body = await validateBody(request, CardControlsMCCActionSchema);
 
     const card = await prisma.card.findFirst({
       where: { id, userId },
     });
 
     if (!card) {
-      return NextResponse.json(
-        ApiResponseHelper.error('Card not found', 'NOT_FOUND'),
-        { status: HttpStatusCode.NOT_FOUND }
-      );
+      return errorResponse('NOT_FOUND', 'Card not found', 404, undefined, requestId);
     }
 
     // Update MCC lists
     const updateData: any = {};
     
-    if (action === 'block') {
-      const newBlockedMCC = [...new Set([...card.blockedMCC, ...mccCodes])];
+    if (body.action === 'block') {
+      const newBlockedMCC = [...new Set([...card.blockedMCC, ...body.mccCodes])];
       updateData.blockedMCC = newBlockedMCC;
-    } else if (action === 'allow') {
-      const newAllowedMCC = [...new Set([...card.allowedMCC, ...mccCodes])];
+    } else if (body.action === 'allow') {
+      const newAllowedMCC = [...new Set([...card.allowedMCC, ...body.mccCodes])];
       updateData.allowedMCC = newAllowedMCC;
     }
 
@@ -212,19 +183,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       data: updateData,
     });
 
-    return NextResponse.json(
-      ApiResponseHelper.success({
-        blockedMCC: updatedCard.blockedMCC,
-        allowedMCC: updatedCard.allowedMCC,
-      }, `MCC codes ${action}ed successfully`),
-      { status: HttpStatusCode.OK }
-    );
+    return successResponse({
+      blockedMCC: updatedCard.blockedMCC,
+      allowedMCC: updatedCard.allowedMCC,
+    }, 200, requestId);
 
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return validationErrorResponse(error, requestId);
+    }
+    
     logError('Failed to update MCC controls', error);
-    return NextResponse.json(
-      ApiResponseHelper.error('Internal server error', 'INTERNAL_ERROR'),
-      { status: HttpStatusCode.INTERNAL_SERVER_ERROR }
-    );
+    return errorResponse('INTERNAL_SERVER_ERROR', 'Failed to update MCC controls', 500, process.env.NODE_ENV === 'development' ? error : undefined, requestId);
   }
 }

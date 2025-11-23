@@ -2,17 +2,19 @@
  * Server-side Authentication Helpers
  * 
  * Utilities for extracting and validating user information from requests
+ * Uses Firebase Authentication
  */
 
 import { NextRequest } from 'next/server';
-import { decodeJwt } from '@/lib/jwtUtils';
+import { verifyIdToken } from '@/lib/firebase/admin';
 
-const ACCESS_TOKEN_COOKIE = 'auth-token';
-const ID_TOKEN_COOKIE = 'auth-id-token';
+const ID_TOKEN_COOKIE = 'firebase-id-token';
+const AUTH_TOKEN_COOKIE = 'firebase-auth-token';
 
 export interface AuthenticatedUser {
   id: string;
   email?: string;
+  emailVerified?: boolean;
   roles?: string[];
   authTime?: number;
 }
@@ -21,55 +23,99 @@ export interface AuthenticatedUser {
  * Extract authenticated user from request cookies
  * Returns null if no valid token is found
  */
-export function getUserFromRequest(request: NextRequest): AuthenticatedUser | null {
-  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
-  const idToken = request.cookies.get(ID_TOKEN_COOKIE)?.value;
-  const token = accessToken || idToken;
-  
-  if (!token) return null;
+export async function getUserFromRequest(request: NextRequest): Promise<AuthenticatedUser | null> {
+  try {
+    // Get Firebase ID token from cookies
+    // Check multiple cookie names for compatibility
+    const idToken = request.cookies.get(ID_TOKEN_COOKIE)?.value || 
+                    request.cookies.get(AUTH_TOKEN_COOKIE)?.value ||
+                    request.cookies.get('firebase-id-token')?.value ||
+                    request.cookies.get('auth-token')?.value;
+    
+    if (!idToken) {
+      // No token found - check if this is a development request
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Auth] No Firebase ID token found in cookies');
+      }
+      return null;
+    }
 
-  const payload = decodeJwt(token);
-  if (!payload) return null;
+    // Verify Firebase ID token
+    const decodedToken = await verifyIdToken(idToken);
 
-  // Check if token is expired
-  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    // Extract user information from Firebase token
+    return {
+      id: decodedToken.uid,
+      email: decodedToken.email,
+      emailVerified: decodedToken.email_verified || false,
+      roles: (decodedToken.roles as string[]) || [],
+      authTime: decodedToken.auth_time,
+    };
+  } catch (error) {
+    // Token is invalid or expired
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Auth] Token verification failed:', error);
+    }
     return null;
   }
+}
 
-  // Extract roles from various possible claim locations
-  const roles = Array.isArray(payload.roles)
-    ? payload.roles
-    : Array.isArray(payload['extension_Roles'])
-    ? payload['extension_Roles']
-    : [];
+/**
+ * Extract user from request synchronously (for backward compatibility)
+ * Note: This doesn't verify the token, use with caution
+ */
+export function getUserFromRequestSync(request: NextRequest): AuthenticatedUser | null {
+  const idToken = request.cookies.get(ID_TOKEN_COOKIE)?.value || 
+                  request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
+  
+  if (!idToken) return null;
 
-  // Extract email from various possible claim locations
-  const email = payload.email || 
-    payload.preferred_username || 
-    (Array.isArray(payload.emails) ? payload.emails[0] : undefined);
+  // Basic JWT decode without verification (for non-critical paths)
+  try {
+    const parts = idToken.split('.');
+    if (parts.length !== 3) return null;
+    
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    
+    // Check if token is expired
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
 
-  return {
-    id: payload.oid || payload.sub || '',
-    email,
-    roles,
-    authTime: payload.auth_time ? Number(payload.auth_time) : undefined,
-  };
+    return {
+      id: payload.user_id || payload.sub || payload.uid || '',
+      email: payload.email,
+      emailVerified: payload.email_verified || false,
+      roles: payload.roles || [],
+      authTime: payload.auth_time,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Extract user ID from request or authorization header
  * Returns null if no valid authentication is found
  */
-export function getUserIdFromRequest(request: NextRequest): string | null {
-  const user = getUserFromRequest(request);
+export async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
+  const user = await getUserFromRequest(request);
+  return user?.id || null;
+}
+
+/**
+ * Extract user ID synchronously (for backward compatibility)
+ */
+export function getUserIdFromRequestSync(request: NextRequest): string | null {
+  const user = getUserFromRequestSync(request);
   return user?.id || null;
 }
 
 /**
  * Require authentication - throws if no valid user found
  */
-export function requireAuth(request: NextRequest): AuthenticatedUser {
-  const user = getUserFromRequest(request);
+export async function requireAuth(request: NextRequest): Promise<AuthenticatedUser> {
+  const user = await getUserFromRequest(request);
   
   if (!user) {
     throw new Error('UNAUTHORIZED');

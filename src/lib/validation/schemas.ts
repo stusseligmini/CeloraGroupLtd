@@ -65,9 +65,11 @@ export const TokenRefreshResponseSchema = z.object({
 
 export const WalletCreateRequestSchema = z.object({
   blockchain: BlockchainSchema,
+  address: z.string(), // Wallet address (derived client-side)
+  publicKey: z.string().optional(), // Public key (derived client-side)
+  mnemonicHash: z.string().optional(), // SHA-256 hash of mnemonic for recovery verification only
   label: z.string().min(1).max(100).optional(),
   isDefault: z.boolean().default(false),
-  encryptedMnemonic: z.string().optional(),
   derivationPath: z.string().optional(),
 });
 
@@ -271,6 +273,7 @@ export const CardCreateRequestSchema = z.object({
   spendingLimit: z.number().positive().optional(),
   dailyLimit: z.number().positive().optional(),
   monthlyLimit: z.number().positive().optional(),
+  provider: z.enum(['mock', 'gnosis', 'highnote', 'deserve']).optional(),
 });
 
 export const CardUpdateRequestSchema = z.object({
@@ -307,6 +310,8 @@ export const CardResponseSchema = z.object({
   lastUsedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  provider: z.enum(['mock', 'gnosis', 'highnote', 'deserve']),
+  providerCardId: z.string().nullable(),
 });
 
 export const CardDetailsResponseSchema = CardResponseSchema.extend({
@@ -429,6 +434,454 @@ export type UnlockVaultRequest = z.infer<typeof UnlockVaultRequestSchema>;
 export type UnlockVaultResponse = z.infer<typeof UnlockVaultResponseSchema>;
 export type VaultStatusResponse = z.infer<typeof VaultStatusResponseSchema>;
 export type UpdateVaultSettingsRequest = z.infer<typeof UpdateVaultSettingsRequestSchema>;
+
+// ============================================================================
+// Swap API Schemas
+// ============================================================================
+
+export const SwapQuoteRequestSchema = z.object({
+  blockchain: BlockchainSchema,
+  fromToken: z.string().min(1),
+  toToken: z.string().min(1),
+  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Amount must be a valid number'),
+});
+
+export const SwapExecuteRequestSchema = z.object({
+  blockchain: BlockchainSchema,
+  fromToken: z.string().min(1),
+  toToken: z.string().min(1),
+  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Amount must be a valid number'),
+  walletId: z.string().uuid(),
+  quoteResponse: z.any().optional(), // Jupiter quote response for Solana
+  signedTransaction: z.string().min(1), // Signed transaction (hex for EVM, base64 for Solana)
+});
+
+export const SwapQuoteResponseSchema = z.object({
+  fromToken: z.string(),
+  toToken: z.string(),
+  fromAmount: z.string(),
+  toAmount: z.string(),
+  estimatedGas: z.string().optional(),
+  priceImpact: z.number().optional(),
+  route: z.array(z.any()).optional(),
+});
+
+export const SwapExecuteResponseSchema = z.object({
+  txHash: z.string(),
+  blockchain: BlockchainSchema,
+});
+
+// ============================================================================
+// Budget API Schemas
+// ============================================================================
+
+export const BudgetSummaryResponseSchema = z.object({
+  summary: z.object({
+    totalSpent: z.number(),
+    totalLimit: z.number().nullable(),
+    remaining: z.number().nullable(),
+    period: z.string(),
+  }),
+  limits: z.array(
+    z.object({
+      id: z.string().uuid(),
+      limitType: z.enum(['daily', 'weekly', 'monthly', 'category']),
+      amount: z.number(),
+      currentSpent: z.number(),
+      walletId: z.string().uuid().nullable(),
+      cardId: z.string().uuid().nullable(),
+      category: z.string().nullable(),
+    })
+  ),
+});
+
+export const CreateSpendingLimitRequestSchema = z.object({
+  limitType: z.enum(['daily', 'weekly', 'monthly', 'category']),
+  amount: z.number().positive(),
+  walletId: z.string().uuid().optional(),
+  cardId: z.string().uuid().optional(),
+  category: z.string().optional(),
+});
+
+// ============================================================================
+// Staking API Schemas
+// ============================================================================
+
+export const StakingPositionResponseSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  walletId: z.string().uuid(),
+  blockchain: BlockchainSchema,
+  amount: z.string(),
+  validatorAddress: z.string().nullable(),
+  apr: z.number().nullable(),
+  rewards: z.string(),
+  status: z.string(),
+  protocol: z.string().nullable(),
+  stakedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export const StakingPositionsResponseSchema = z.object({
+  positions: z.array(StakingPositionResponseSchema),
+});
+
+export const StakeRequestSchema = z.object({
+  blockchain: BlockchainSchema,
+  walletId: z.string().uuid(),
+  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Amount must be a valid number'),
+  validatorAddress: z.string().optional(),
+  privateKey: z.string().min(1), // Encrypted private key
+});
+
+export const StakeResponseSchema = z.object({
+  success: z.boolean(),
+  txHash: z.string(),
+});
+
+// ============================================================================
+// MultiSig API Schemas
+// ============================================================================
+
+export const CreateMultiSigWalletRequestSchema = z.object({
+  blockchain: BlockchainSchema,
+  requiredSignatures: z.number().int().positive(),
+  signers: z.array(
+    z.object({
+      address: z.string().min(1),
+      name: z.string().optional(),
+      email: z.string().email().optional(),
+    })
+  ).min(2),
+}).refine(
+  (data) => data.requiredSignatures <= data.signers.length,
+  {
+    message: 'Required signatures cannot exceed total signers',
+    path: ['requiredSignatures'],
+  }
+);
+
+export const MultiSigWalletResponseSchema = z.object({
+  id: z.string().uuid(),
+  blockchain: BlockchainSchema,
+  address: z.string(),
+  requiredSignatures: z.number().int(),
+  totalSigners: z.number().int(),
+  signers: z.array(
+    z.object({
+      id: z.string().uuid(),
+      address: z.string(),
+      name: z.string().nullable(),
+      email: z.string().nullable(),
+    })
+  ),
+  createdAt: z.string().datetime(),
+});
+
+// ============================================================================
+// Payment Request API Schemas
+// ============================================================================
+
+export const PaymentRequestListQuerySchema = PaginationSchema.extend({
+  status: z.enum(['pending', 'fulfilled', 'cancelled', 'expired']).optional(),
+});
+
+export const PaymentRequestResponseSchema = z.object({
+  id: z.string().uuid(),
+  senderId: z.string().uuid(),
+  receiverId: z.string().uuid(),
+  amount: z.string(),
+  blockchain: BlockchainSchema,
+  tokenSymbol: z.string().nullable(),
+  memo: z.string().nullable(),
+  status: z.string(),
+  txHash: z.string().nullable(),
+  requestType: z.string().nullable(),
+  splitBillId: z.string().uuid().nullable(),
+  fulfilledTxHash: z.string().nullable(),
+  fulfilledAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),
+});
+
+export const CreatePaymentRequestSchema = z.object({
+  receiverId: z.string().uuid(),
+  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Amount must be a valid number'),
+  blockchain: BlockchainSchema,
+  memo: z.string().max(500).optional(),
+  tokenSymbol: z.string().optional(),
+});
+
+export const PaymentRequestsResponseSchema = z.object({
+  requests: z.array(PaymentRequestResponseSchema),
+});
+
+// ============================================================================
+// NFT API Schemas
+// ============================================================================
+
+export const NFTListQuerySchema = PaginationSchema.extend({
+  walletId: z.string().uuid().optional(),
+  blockchain: BlockchainSchema.optional(),
+});
+
+export const NFTResponseSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  walletId: z.string().uuid(),
+  blockchain: BlockchainSchema,
+  contractAddress: z.string(),
+  tokenId: z.string(),
+  tokenStandard: z.string().nullable(),
+  name: z.string().nullable(),
+  description: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  animationUrl: z.string().nullable(),
+  metadata: z.record(z.unknown()).nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export const NFTsResponseSchema = z.object({
+  nfts: z.array(NFTResponseSchema),
+});
+
+export const SyncNFTsRequestSchema = z.object({
+  walletId: z.string().uuid(),
+  blockchain: BlockchainSchema,
+  address: z.string().min(1),
+});
+
+// ============================================================================
+// Telegram API Schemas
+// ============================================================================
+
+export const TelegramWebhookUpdateSchema = z.object({
+  update_id: z.number(),
+  message: z.any().optional(),
+  callback_query: z.any().optional(),
+  edited_message: z.any().optional(),
+  channel_post: z.any().optional(),
+});
+
+export const TelegramWebhookResponseSchema = z.object({
+  ok: z.boolean(),
+});
+
+// ============================================================================
+// Wallet List API Schemas
+// ============================================================================
+
+export const WalletListQuerySchema = PaginationSchema.extend({
+  blockchain: BlockchainSchema.optional(),
+  includeHidden: z.coerce.boolean().default(false),
+});
+
+export const WalletListResponseSchema = z.object({
+  wallets: z.array(
+    z.object({
+      id: z.string().uuid(),
+      blockchain: BlockchainSchema,
+      address: z.string(),
+      label: z.string().nullable(),
+      isDefault: z.boolean(),
+      isHidden: z.boolean(),
+      balanceCache: z.string().nullable(),
+      balanceFiat: z.number().nullable(),
+      fiatCurrency: z.string().nullable(),
+    })
+  ),
+});
+
+// ============================================================================
+// Card Controls API Schemas
+// ============================================================================
+
+export const CardControlsUpdateSchema = z.object({
+  allowedMCC: z.array(z.string()).optional(),
+  blockedMCC: z.array(z.string()).optional(),
+  allowedCountries: z.array(z.string().length(2)).optional(),
+  blockedCountries: z.array(z.string().length(2)).optional(),
+  cashbackRate: z.number().min(0).max(0.2).optional(),
+  isOnline: z.boolean().optional(),
+  isContactless: z.boolean().optional(),
+  isATM: z.boolean().optional(),
+});
+
+export const CardControlsMCCActionSchema = z.object({
+  mccCodes: z.array(z.string()).min(1),
+  action: z.enum(['block', 'allow']),
+});
+
+export const CardControlsResponseSchema = z.object({
+  controls: z.object({
+    allowedMCC: z.array(z.string()),
+    blockedMCC: z.array(z.string()),
+    allowedCountries: z.array(z.string()),
+    blockedCountries: z.array(z.string()),
+    cashbackRate: z.number(),
+    isOnline: z.boolean(),
+    isContactless: z.boolean(),
+    isATM: z.boolean(),
+    isDisposable: z.boolean().optional(),
+    autoFreezeRules: z.any().optional(),
+  }),
+});
+
+// ============================================================================
+// Type Exports (continued)
+// ============================================================================
+
+// Swap
+export type SwapQuoteRequest = z.infer<typeof SwapQuoteRequestSchema>;
+export type SwapExecuteRequest = z.infer<typeof SwapExecuteRequestSchema>;
+export type SwapQuoteResponse = z.infer<typeof SwapQuoteResponseSchema>;
+export type SwapExecuteResponse = z.infer<typeof SwapExecuteResponseSchema>;
+
+// Budget
+export type BudgetSummaryResponse = z.infer<typeof BudgetSummaryResponseSchema>;
+export type CreateSpendingLimitRequest = z.infer<typeof CreateSpendingLimitRequestSchema>;
+
+// Staking
+export type StakingPositionResponse = z.infer<typeof StakingPositionResponseSchema>;
+export type StakingPositionsResponse = z.infer<typeof StakingPositionsResponseSchema>;
+export type StakeRequest = z.infer<typeof StakeRequestSchema>;
+export type StakeResponse = z.infer<typeof StakeResponseSchema>;
+
+// MultiSig
+export type CreateMultiSigWalletRequest = z.infer<typeof CreateMultiSigWalletRequestSchema>;
+export type MultiSigWalletResponse = z.infer<typeof MultiSigWalletResponseSchema>;
+
+// Payment Request
+export type PaymentRequestListQuery = z.infer<typeof PaymentRequestListQuerySchema>;
+export type PaymentRequestResponse = z.infer<typeof PaymentRequestResponseSchema>;
+export type CreatePaymentRequest = z.infer<typeof CreatePaymentRequestSchema>;
+export type PaymentRequestsResponse = z.infer<typeof PaymentRequestsResponseSchema>;
+
+// NFT
+export type NFTListQuery = z.infer<typeof NFTListQuerySchema>;
+export type NFTResponse = z.infer<typeof NFTResponseSchema>;
+export type NFTsResponse = z.infer<typeof NFTsResponseSchema>;
+export type SyncNFTsRequest = z.infer<typeof SyncNFTsRequestSchema>;
+
+// Telegram
+export type TelegramWebhookUpdate = z.infer<typeof TelegramWebhookUpdateSchema>;
+export type TelegramWebhookResponse = z.infer<typeof TelegramWebhookResponseSchema>;
+
+// Wallet List
+export type WalletListQuery = z.infer<typeof WalletListQuerySchema>;
+export type WalletListResponse = z.infer<typeof WalletListResponseSchema>;
+
+// Card Controls
+export type CardControlsUpdate = z.infer<typeof CardControlsUpdateSchema>;
+export type CardControlsMCCAction = z.infer<typeof CardControlsMCCActionSchema>;
+export type CardControlsResponse = z.infer<typeof CardControlsResponseSchema>;
+
+// ============================================================================
+// Contact Resolution API Schemas
+// ============================================================================
+
+export const ResolveContactRequestSchema = z.object({
+  type: z.enum(['username', 'phone']),
+  value: z.string().min(1),
+});
+
+export const ResolvedContactResponseSchema = z.object({
+  userId: z.string().uuid(),
+  address: z.string().optional(),
+  blockchain: BlockchainSchema.optional(),
+  displayName: z.string().optional(),
+});
+
+// ============================================================================
+// Card Insights API Schemas
+// ============================================================================
+
+export const CardInsightsQuerySchema = PaginationSchema.extend({
+  cardId: z.string().uuid().optional(),
+  severity: z.enum(['info', 'warning', 'critical']).optional(),
+});
+
+export const CardInsightResponseSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  cardId: z.string().uuid().nullable(),
+  type: z.string(),
+  severity: z.string(),
+  title: z.string(),
+  description: z.string(),
+  recommendation: z.string().nullable(),
+  amount: z.number().nullable(),
+  category: z.string().nullable(),
+  metadata: z.record(z.unknown()).nullable(),
+  isRead: z.boolean(),
+  isDismissed: z.boolean(),
+  insightDate: z.string().datetime(),
+  createdAt: z.string().datetime(),
+});
+
+export const CardInsightsResponseSchema = z.object({
+  insights: z.array(CardInsightResponseSchema),
+});
+
+export const CreateCardInsightRequestSchema = z.object({
+  cardId: z.string().uuid().optional(),
+  type: z.string().min(1),
+  severity: z.enum(['info', 'warning', 'critical']).default('info'),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1),
+  recommendation: z.string().optional(),
+  amount: z.number().optional(),
+  category: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const UpdateCardInsightRequestSchema = z.object({
+  isRead: z.boolean().optional(),
+  isDismissed: z.boolean().optional(),
+});
+
+// ============================================================================
+// Card Authorization API Schemas
+// ============================================================================
+
+export const CardAuthorizationRequestSchema = z.object({
+  cardId: z.string().uuid(),
+  amount: z.number().positive(),
+  currency: z.string().length(3),
+  merchantName: z.string().min(1),
+  merchantCity: z.string().optional(),
+  merchantCountry: z.string().length(2),
+  mcc: z.string().min(4).max(4), // Merchant Category Code
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+});
+
+export const CardAuthorizationResponseSchema = z.object({
+  approved: z.boolean(),
+  transactionId: z.string().uuid().optional(),
+  declineReason: z.string().optional(),
+  message: z.string(),
+  cashbackAmount: z.number().optional(),
+});
+
+// ============================================================================
+// Type Exports (continued)
+// ============================================================================
+
+// Contact Resolution
+export type ResolveContactRequest = z.infer<typeof ResolveContactRequestSchema>;
+export type ResolvedContactResponse = z.infer<typeof ResolvedContactResponseSchema>;
+
+// Card Insights
+export type CardInsightsQuery = z.infer<typeof CardInsightsQuerySchema>;
+export type CardInsightResponse = z.infer<typeof CardInsightResponseSchema>;
+export type CardInsightsResponse = z.infer<typeof CardInsightsResponseSchema>;
+export type CreateCardInsightRequest = z.infer<typeof CreateCardInsightRequestSchema>;
+export type UpdateCardInsightRequest = z.infer<typeof UpdateCardInsightRequestSchema>;
+
+// Card Authorization
+export type CardAuthorizationRequest = z.infer<typeof CardAuthorizationRequestSchema>;
+export type CardAuthorizationResponse = z.infer<typeof CardAuthorizationResponseSchema>;
 
 // Errors
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;

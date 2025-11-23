@@ -7,9 +7,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { ApiResponseHelper, HttpStatusCode } from '@/types/api';
 import { CardCreateRequestSchema, CardListQuerySchema } from '@/lib/validation/schemas';
-import { encrypt, generateCardNumber, generateCVV, getLastFourDigits, validateExpiry } from '@/lib/security/encryption';
+import { encrypt, generateCardNumber, generateCVV, getLastFourDigits } from '@/lib/security/encryption';
 import { logError } from '@/lib/logger';
 import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
+import { ensureProvidersInitialized, selectProviderForUser, getProvider, isProviderAvailable } from '@/server/services/cardIssuing/factory';
+import type { CardProvider, CardDetails as ProviderCardDetails } from '@/server/services/cardIssuing/types';
 
 const prisma = new PrismaClient();
 
@@ -82,6 +84,9 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
           activatedAt: true,
           encryptedNumber: true, // For last 4 digits only
+          provider: true,
+          providerCardId: true,
+          providerStatus: true,
         },
       }),
       prisma.card.count({ where }),
@@ -116,6 +121,9 @@ export async function GET(request: NextRequest) {
         createdAt: card.createdAt.toISOString(),
         updatedAt: card.updatedAt.toISOString(),
         activatedAt: card.activatedAt?.toISOString() || null,
+        provider: card.provider,
+        providerCardId: card.providerCardId,
+        providerStatus: card.providerStatus,
       };
     });
 
@@ -160,7 +168,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { walletId, nickname, brand, type, spendingLimit, dailyLimit, monthlyLimit } = validation.data;
+    const { walletId, nickname, brand, type, spendingLimit, dailyLimit, monthlyLimit, provider: providerOverride } = validation.data;
 
     // Verify wallet belongs to user
     const wallet = await prisma.wallet.findFirst({
@@ -174,45 +182,107 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate card details
-    const cardNumber = generateCardNumber(brand);
-    const cvv = generateCVV();
-    
-    // Encrypt sensitive data
-    const encryptedNumber = encrypt(cardNumber);
-    const encryptedCVV = encrypt(cvv);
-    
-    // Set expiry date (3 years from now)
-    const now = new Date();
-    const expiryMonth = now.getMonth() + 1;
-    const expiryYear = now.getFullYear() + 3;
+    await ensureProvidersInitialized();
 
-    // Get cardholder name from user
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { displayName: true, email: true },
+      select: {
+        displayName: true,
+        email: true,
+        preferredCardProvider: true,
+        cardType: true,
+      },
     });
 
-    const cardholderName = (user?.displayName || user?.email?.split('@')[0] || 'CARDHOLDER').toUpperCase();
+    const cardholderNameResolved = (user?.displayName || user?.email?.split('@')[0] || 'CARDHOLDER').toUpperCase();
+    const inferredCardType = (user?.cardType as 'crypto-native' | 'traditional' | undefined) || (type === 'physical' ? 'traditional' : undefined);
+    let providerName: CardProvider =
+      (providerOverride as CardProvider | undefined) ||
+      (user?.preferredCardProvider as CardProvider | undefined) ||
+      selectProviderForUser(undefined, inferredCardType);
 
-    // Create card
+    if (!providerName || !isProviderAvailable(providerName)) {
+      providerName = selectProviderForUser(undefined, inferredCardType);
+    }
+
+    if (!isProviderAvailable(providerName)) {
+      providerName = 'mock';
+    }
+
+    const provider = getProvider(providerName);
+
+    const createRequest = {
+      userId,
+      walletId,
+      nickname,
+      brand,
+      type,
+      spendingLimit,
+      dailyLimit,
+      monthlyLimit,
+      cardholderName: cardholderNameResolved,
+    };
+
+    let providerResponse = await provider.createCard(createRequest);
+
+    if (!providerResponse.success) {
+      if (providerName !== 'mock') {
+        const fallbackProvider = getProvider('mock');
+        providerName = 'mock';
+        providerResponse = await fallbackProvider.createCard(createRequest);
+      }
+
+      if (!providerResponse.success) {
+        return NextResponse.json(
+          ApiResponseHelper.error(providerResponse.error || 'Failed to create card', 'CARD_PROVIDER_ERROR'),
+          { status: HttpStatusCode.BAD_GATEWAY }
+        );
+      }
+    }
+
+    const providerCard = providerResponse.data;
+    const providerCardDetails = providerResponse.providerData?.cardDetails as ProviderCardDetails | undefined;
+
+    const rawCardNumber = providerCardDetails?.cardNumber ?? generateCardNumber(brand);
+    const rawCvv = providerCardDetails?.cvv ?? generateCVV();
+
+    const encryptedNumber = encrypt(rawCardNumber);
+    // CVV is NEVER stored (PCI DSS) - only returned once in this response
+
+    const now = new Date();
+    const expiryMonth = providerCard?.expiryMonth ?? now.getMonth() + 1;
+    const expiryYear = providerCard?.expiryYear ?? now.getFullYear() + 3;
+    const persistedCardholderName = providerCard?.cardholderName ?? cardholderNameResolved;
+    const status = providerCard?.status ?? 'active';
+    const providerCardId =
+      providerResponse.providerData?.providerCardId ||
+      providerCard?.providerId ||
+      providerCard?.id;
+    const providerMetadata = providerResponse.providerData?.raw ?? providerResponse.providerData;
+    const lastFourDigits = providerCard?.lastFourDigits ?? getLastFourDigits(rawCardNumber);
+
     const card = await prisma.card.create({
       data: {
         userId,
         walletId,
         encryptedNumber,
-        encryptedCVV,
-        cardholderName,
+        cardholderName: persistedCardholderName,
         expiryMonth,
         expiryYear,
-        nickname,
-        brand,
-        type,
-        spendingLimit,
-        dailyLimit,
-        monthlyLimit,
-        status: 'active',
+        nickname: providerCard?.nickname ?? nickname,
+        brand: providerCard?.brand ?? brand,
+        type: providerCard?.type ?? type ?? 'virtual',
+        spendingLimit: providerCard?.spendingLimit ?? spendingLimit,
+        dailyLimit: providerCard?.dailyLimit ?? dailyLimit,
+        monthlyLimit: providerCard?.monthlyLimit ?? monthlyLimit,
+        status,
+        isOnline: providerCard?.isOnline ?? true,
+        isContactless: providerCard?.isContactless ?? true,
+        isATM: providerCard?.isATM ?? (type === 'physical'),
         activatedAt: new Date(),
+        provider: providerName,
+        providerCardId,
+        providerStatus: status,
       },
     });
 
@@ -225,7 +295,7 @@ export async function POST(request: NextRequest) {
           nickname: card.nickname,
           brand: card.brand,
           type: card.type,
-          lastFourDigits: getLastFourDigits(cardNumber),
+          lastFourDigits,
           cardholderName: card.cardholderName,
           expiryMonth: card.expiryMonth,
           expiryYear: card.expiryYear,
@@ -241,8 +311,13 @@ export async function POST(request: NextRequest) {
           createdAt: card.createdAt.toISOString(),
           updatedAt: card.updatedAt.toISOString(),
           activatedAt: card.activatedAt?.toISOString() || null,
+          provider: card.provider,
+          providerCardId,
+          // CVV and card number returned ONCE (never stored, never retrievable)
+          cvv: rawCvv,
+          cardNumber: rawCardNumber,
         },
-      }, 'Card created successfully'),
+      }, 'Card created - store CVV securely, it cannot be retrieved again'),
       { status: HttpStatusCode.CREATED }
     );
 

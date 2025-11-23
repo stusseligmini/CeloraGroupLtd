@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/lib/logger';
 
 interface HiddenVaultProps {
   walletId: string;
@@ -46,7 +47,7 @@ export function HiddenVault({ walletId, onUnlocked }: HiddenVaultProps) {
         setMode(data.data.hasPinSet ? 'unlock' : 'setup');
       }
     } catch (err) {
-      console.error('Failed to load vault status:', err);
+      logger.error('Failed to load vault status', err instanceof Error ? err : undefined, { walletId });
     }
   };
 

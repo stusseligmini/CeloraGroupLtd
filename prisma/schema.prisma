@@ -23,11 +23,22 @@ model User {
   
   // Profile
   displayName   String?  @map("display_name")
+  username      String?  @unique // Unique username for @mentions
   phoneNumber   String?  @map("phone_number")
   
   // Security
   twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
   twoFactorSecret  String? @map("two_factor_secret")
+  
+  // Card preferences
+  preferredCardProvider String? @map("preferred_card_provider") // 'stripe', 'marqeta', 'lithic'
+  cardType              String? @map("card_type") // 'virtual', 'physical'
+  
+  // Integrations
+  telegramId    String?  @unique @map("telegram_id") // For Telegram bot integration
+  telegramUsername String? @map("telegram_username")
+  telegramLinkedAt DateTime? @map("telegram_linked_at")
+  telegramNotificationsEnabled Boolean @default(true) @map("telegram_notifications_enabled")
   
   // Timestamps
   createdAt     DateTime @default(now()) @map("created_at")
@@ -35,9 +46,12 @@ model User {
   lastLoginAt   DateTime? @map("last_login_at")
   
   // Relations
-  wallets       Wallet[]
-  notifications Notification[]
-  sessions      Session[]
+  wallets                Wallet[]           @relation
+  notifications          Notification[]     @relation
+  sessions               Session[]          @relation
+  guardiansFor           WalletGuardian[]   @relation("GuardianUser")
+  sentPaymentRequests    PaymentRequest[]   @relation("SentPaymentRequests")
+  receivedPaymentRequests PaymentRequest[]  @relation("ReceivedPaymentRequests")
   
   @@map("users")
   @@index([azureB2CId])
@@ -81,9 +95,9 @@ model Wallet {
   address        String   
   publicKey      String?  @map("public_key")
   
-  // Encrypted private data (AES-256)
-  encryptedPrivateKey String? @map("encrypted_private_key") @db.Text
-  encryptedMnemonic   String? @map("encrypted_mnemonic") @db.Text
+  // Non-custodial: Only store mnemonic hash for recovery verification
+  // Private keys are NEVER stored on server - they're encrypted client-side with user password
+  mnemonicHash        String?  @map("mnemonic_hash") // SHA-256 hash of mnemonic for recovery verification only
   
   // Balance cache (stored in smallest unit: wei, satoshi, etc)
   balanceCache   String?  @map("balance_cache")
@@ -106,10 +120,20 @@ model Wallet {
   updatedAt      DateTime @updatedAt @map("updated_at")
   lastSyncedAt   DateTime? @map("last_synced_at")
   
+  // Multi-sig wallet fields
+  walletType         String?  @default("standard") @map("wallet_type") // 'standard', 'multisig', 'hardware'
+  requiredSignatures Int?     @map("required_signatures") // For multisig wallets
+  totalSigners       Int?     @map("total_signers") // Total number of signers for multisig
+  
   // Relations
   user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
   cards          Card[]
+  guardians      WalletGuardian[]
+  multiSigSigners MultiSigSigner[]
+  scheduledPayments ScheduledPayment[]
+  stakingPositions  StakingPosition[]
+  pendingTransactions PendingTransaction[] @relation("PendingTransactions")
   
   @@unique([userId, address, blockchain])
   @@map("wallets")
@@ -127,7 +151,7 @@ model Card {
   
   // Card details (encrypted)
   encryptedNumber String   @map("encrypted_number") @db.Text
-  encryptedCVV    String   @map("encrypted_cvv")
+  // CVV is NEVER stored (PCI DSS compliance) - returned once on creation only
   cardholderName  String   @map("cardholder_name")
   expiryMonth     Int      @map("expiry_month")
   expiryYear      Int      @map("expiry_year")
@@ -160,6 +184,23 @@ model Card {
   allowedCountries String[] @default([]) @map("allowed_countries") // ISO country codes
   blockedCountries String[] @default([]) @map("blocked_countries")
   cashbackRate    Decimal? @default(0.02) @map("cashback_rate") @db.Decimal(5, 4) // 2% default
+  
+  // Rewards tracking
+  rewardsEarned   Decimal  @default(0) @map("rewards_earned") @db.Decimal(20, 2)
+  loyaltyPoints   Int      @default(0) @map("loyalty_points")
+  
+  // Wallet provisioning (Apple Pay, Google Pay)
+  applePayTokenId  String?  @map("apple_pay_token_id")
+  googlePayTokenId String?  @map("google_pay_token_id")
+  
+  // Physical card tracking
+  physicalCardOrdered   Boolean   @default(false) @map("physical_card_ordered")
+  physicalCardShippedAt DateTime? @map("physical_card_shipped_at")
+  
+  // Provider tracking (for third-party card issuers)
+  provider        String?  // 'stripe', 'marqeta', 'lithic', etc
+  providerCardId  String?  @map("provider_card_id") // External card ID from provider
+  providerStatus  String?  @map("provider_status") // Provider's card status
   
   // Subscription tracking
   isSubscription  Boolean  @default(false) @map("is_subscription")
@@ -417,4 +458,360 @@ model RateLimit {
   @@index([identifier])
   @@index([endpoint])
   @@index([windowEnd])
+}
+
+// Multi-sig wallet signers
+model MultiSigSigner {
+  id          String   @id @default(uuid())
+  walletId    String   @map("wallet_id")
+  address     String
+  name        String?
+  email       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  wallet      Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  @@map("multisig_signers")
+  @@index([walletId])
+}
+
+// Pending multi-sig transactions
+model PendingTransaction {
+  id              String   @id @default(uuid())
+  walletId        String   @map("wallet_id")
+  toAddress       String   @map("to_address")
+  amount          String
+  blockchain      String
+  data            String?  @db.Text
+  memo            String?  @db.Text
+  signedBy        String[] @default([]) @map("signed_by")
+  signatures      Json     @default("[]") @db.JsonB
+  requiredSigs    Int      @map("required_sigs")
+  currentSigs     Int      @default(0) @map("current_sigs") // Current number of signatures
+  createdBy       String   @map("created_by")
+  executedTxHash  String?  @map("executed_tx_hash")
+  status          String   @default("pending")
+  createdAt       DateTime @default(now()) @map("created_at")
+  expiresAt       DateTime @map("expires_at")
+  
+  wallet          Wallet   @relation("PendingTransactions", fields: [walletId], references: [id], onDelete: Cascade)
+  
+  @@map("pending_transactions")
+  @@index([walletId])
+  @@index([status])
+}
+
+// Staking positions
+model StakingPosition {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  walletId        String   @map("wallet_id")
+  blockchain      String
+  amount          String
+  validatorAddress String? @map("validator_address")
+  apr             Decimal? @db.Decimal(5, 2)
+  rewards         String   @default("0")
+  status          String   @default("active")
+  txHash          String?  @map("tx_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Additional staking fields
+  protocol              String?   @map("protocol")          // 'native', 'lido', 'marinade'
+  validator             String?   @map("validator")         // Validator address or name
+  stakedAmount          String?   @map("staked_amount")     // Amount staked (may differ from amount)
+  stakedAt              DateTime? @map("staked_at")         // When staking occurred
+  stakeAccountAddress   String?   @map("stake_account_address") // Solana stake account
+  currentApy            Decimal?  @map("current_apy") @db.Decimal(5, 2)
+  unstakeRequestedAt    DateTime? @map("unstake_requested_at")
+  unstakeTxHash         String?   @map("unstake_tx_hash")   // Transaction hash for unstaking
+  
+  wallet          Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  @@map("staking_positions")
+  @@index([userId])
+  @@index([walletId])
+  @@index([blockchain])
+}
+
+// Wallet recovery guardians
+model WalletGuardian {
+  id              String   @id @default(uuid())
+  walletId        String   @map("wallet_id")
+  guardianAddress String?  @map("guardian_address")  // Made optional since might not have address initially
+  guardianName    String?  @map("guardian_name")
+  guardianUserId  String?  @map("guardian_user_id")  // User ID of the guardian
+  guardianEmail   String?  @map("guardian_email")    // Guardian's email
+  status          String   @default("active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  acceptedAt      DateTime? @map("accepted_at")      // When guardian accepted
+  recoveryAttempts Int     @default(0) @map("recovery_attempts")
+  lastRecoveryAt  DateTime? @map("last_recovery_at") // Last recovery attempt timestamp
+  
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  guardian        User?    @relation("GuardianUser", fields: [guardianUserId], references: [id])
+  
+  @@map("wallet_guardians")
+  @@index([walletId])
+  @@index([guardianUserId])
+}
+
+// Audit log for security events
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  action      String
+  resource    String
+  resourceId  String?  @map("resource_id")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent") @db.Text
+  platform    String?  // 'web', 'mobile', 'telegram', 'api'
+  metadata    Json?    @db.JsonB
+  severity    String   @default("info")
+  status      String?  // Additional status field for audit log entries
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// Telegram bot users
+model TelegramUser {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  telegramId            BigInt    @unique @map("telegram_id")
+  chatId                String?   @map("chat_id")              // Telegram chat ID
+  username              String?
+  firstName             String?   @map("first_name")
+  lastName              String?   @map("last_name")
+  languageCode          String?   @map("language_code")
+  verificationCode      String?   @map("verification_code")
+  verificationExpiresAt DateTime? @map("verification_expires_at")
+  isActive              Boolean   @default(true) @map("is_active")
+  linkedAt              DateTime? @map("linked_at")            // When account was linked
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  
+  @@map("telegram_users")
+  @@index([userId])
+  @@index([telegramId])
+}
+
+// Telegram notifications
+model TelegramNotification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  telegramId  BigInt   @map("telegram_id")
+  messageId   Int?     @map("message_id")
+  message     String   @db.Text
+  type        String
+  status      String   @default("pending")
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("telegram_notifications")
+  @@index([userId])
+  @@index([telegramId])
+  @@index([status])
+}
+
+// User contacts
+model UserContact {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  contactType         String    @map("contact_type") // 'phone', 'username', 'address'
+  contactValue        String    @map("contact_value")
+  displayName         String?   @map("display_name")
+  nickname            String?   // Friendly nickname
+  resolvedAddress     String?   @map("resolved_address")     // Resolved blockchain address
+  resolvedBlockchain  String?   @map("resolved_blockchain")  // Resolved blockchain
+  metadata            Json?     @db.JsonB
+  lastUsedAt          DateTime? @map("last_used_at")         // Last time contact was used
+  createdAt           DateTime  @default(now()) @map("created_at")
+  
+  @@unique([userId, contactType, contactValue])
+  @@map("user_contacts")
+  @@index([userId])
+}
+
+// Payment requests
+model PaymentRequest {
+  id              String    @id @default(uuid())
+  senderId        String    @map("sender_id")        // Replaces fromUserId
+  receiverId      String    @map("receiver_id")      // Replaces toUserId
+  amount          String
+  blockchain      String
+  tokenSymbol     String?   @map("token_symbol")
+  memo            String?   @db.Text
+  status          String    @default("pending")      // 'pending', 'fulfilled', 'cancelled', 'expired'
+  txHash          String?   @map("tx_hash")
+  requestType     String?   @map("request_type")     // 'single', 'split_bill'
+  splitBillId     String?   @map("split_bill_id")    // For split bills
+  fulfilledTxHash String?   @map("fulfilled_tx_hash") // Transaction hash when paid
+  fulfilledAt     DateTime? @map("fulfilled_at")      // When payment was made
+  createdAt       DateTime  @default(now()) @map("created_at")
+  expiresAt       DateTime  @map("expires_at")
+  
+  // Relations
+  sender          User      @relation("SentPaymentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver        User      @relation("ReceivedPaymentRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@map("payment_requests")
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+  @@index([splitBillId])
+}
+
+// NFT tracking
+model NFT {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  walletId        String   @map("wallet_id")
+  blockchain      String
+  contractAddress String   @map("contract_address")
+  tokenId         String   @map("token_id")
+  tokenStandard   String?  @map("token_standard") // 'ERC721', 'ERC1155', etc
+  name            String?
+  description     String?  @db.Text
+  imageUrl        String?  @map("image_url") @db.Text
+  animationUrl    String?  @map("animation_url") @db.Text // For animated NFTs
+  metadata        Json?    @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@unique([walletId, contractAddress, tokenId])
+  @@map("nfts")
+  @@index([userId])
+  @@index([walletId])
+  @@index([blockchain, contractAddress, tokenId, walletId], name: "blockchain_contractAddress_tokenId_walletId")
+}
+
+// Spending limits
+model SpendingLimit {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  limitType   String   @map("limit_type") // 'daily', 'weekly', 'monthly', 'category'
+  amount      Decimal  @db.Decimal(20, 2)
+  walletId    String?  @map("wallet_id")
+  cardId      String?  @map("card_id")
+  category    String?
+  currentSpent Decimal @default(0) @map("current_spent") @db.Decimal(20, 2)
+  
+  // Period tracking
+  periodStart DateTime? @map("period_start")
+  periodEnd   DateTime? @map("period_end")
+  resetAt     DateTime @map("reset_at")
+  
+  // Alert settings
+  isActive    Boolean  @default(true) @map("is_active")
+  alertAt     Decimal? @map("alert_at") @db.Decimal(5, 2) // Alert at X% of limit (e.g., 0.80 for 80%)
+  alertSent   Boolean  @default(false) @map("alert_sent")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("spending_limits")
+  @@index([userId])
+  @@index([walletId])
+  @@index([cardId])
+}
+
+// Spending insights
+model SpendingInsight {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        String?   // Alternative field name for insightType
+  insightType String    @map("insight_type")
+  title       String?   // Short title for insight
+  description String?   @db.Text // Detailed description
+  category    String?
+  amount      Decimal?  @db.Decimal(20, 2)
+  percentage  Decimal?  @db.Decimal(5, 2) // Percentage change
+  period      String
+  severity    String?   @default("info") // 'info', 'warning', 'critical'
+  insightDate DateTime? @map("insight_date")
+  data        Json      @db.JsonB
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  @@map("spending_insights")
+  @@index([userId])
+  @@index([insightType])
+}
+
+// Fraud alerts
+model FraudAlert {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  cardId         String?   @map("card_id")
+  alertType      String    @map("alert_type")
+  severity       String
+  title          String?   // Short title for the alert
+  description    String    @db.Text
+  amount         Decimal?  @db.Decimal(20, 2) // Amount involved in fraud
+  confidence     Decimal?  @db.Decimal(5, 2)  // AI confidence score
+  ruleTriggered  String?   @map("rule_triggered") @db.Text // Which rule triggered alert
+  metadata       Json?     @db.JsonB
+  status         String    @default("pending")
+  resolvedAt     DateTime? @map("resolved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  
+  @@map("fraud_alerts")
+  @@index([userId])
+  @@index([cardId])
+  @@index([status])
+}
+
+// Scheduled payments
+model ScheduledPayment {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  walletId    String   @map("wallet_id")
+  toAddress   String   @map("to_address")
+  amount      String
+  blockchain  String
+  tokenSymbol String?  @map("token_symbol")
+  frequency   String   // 'once', 'daily', 'weekly', 'monthly'
+  memo        String?  @db.Text
+  
+  // Control flags
+  isActive    Boolean  @default(true) @map("is_active")
+  isPaused    Boolean  @default(false) @map("is_paused")
+  
+  // Limits
+  maxExecutions    Int?     @map("max_executions")
+  executionCount   Int      @default(0) @map("execution_count")
+  totalAmountLimit String?  @map("total_amount_limit")
+  
+  // Timestamps
+  nextRunAt   DateTime @map("next_run_at")
+  lastRunAt   DateTime? @map("last_run_at")
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  wallet      Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  executions  ScheduledPaymentExecution[]
+  
+  @@map("scheduled_payments")
+  @@index([userId])
+  @@index([status])
+  @@index([nextRunAt])
+}
+
+// Scheduled payment executions
+model ScheduledPaymentExecution {
+  id           String   @id @default(uuid())
+  paymentId    String   @map("payment_id")
+  amount       String
+  txHash       String?  @map("tx_hash")
+  status       String
+  error        String?  @db.Text
+  errorMessage String?  @map("error_message") @db.Text // Detailed error message
+  executedAt   DateTime @default(now()) @map("executed_at")
+  
+  payment      ScheduledPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  
+  @@map("scheduled_payment_executions")
+  @@index([paymentId])
 }

@@ -7,9 +7,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { ApiResponseHelper, HttpStatusCode } from '@/types/api';
 import { SetVaultPinRequestSchema, UnlockVaultRequestSchema, UpdateVaultSettingsRequestSchema } from '@/lib/validation/schemas';
-import { hashPin, verifyPin, isValidPinFormat, isWeakPin, checkPinRateLimit, resetPinAttempts, generateVaultToken } from '@/lib/security/pinProtection';
+import { hashPin, verifyPin, isValidPinFormat, isWeakPin, checkPinRateLimit, resetPinAttempts, generateVaultToken, markVaultUnlocked, isVaultUnlocked } from '@/lib/security/pinProtection';
 import { logError } from '@/lib/logger';
 import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
+
+// Force Node.js runtime for crypto operations
+export const runtime = 'nodejs';
 
 const prisma = new PrismaClient();
 
@@ -155,6 +158,9 @@ export async function PUT(request: NextRequest) {
     // Reset rate limit on successful unlock
     resetPinAttempts(userId, walletId);
 
+    // Mark vault as unlocked in session
+    markVaultUnlocked(userId, walletId, 5 * 60 * 1000); // 5 minutes
+
     // Generate vault session token
     const token = generateVaultToken(userId, walletId);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
@@ -218,9 +224,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if vault is unlocked in current session
-    // TODO: Implement session-based unlock tracking
-    // For now, always return locked for security
-    const isUnlocked = false;
+    const isUnlocked = isVaultUnlocked(userId, walletId);
 
     return NextResponse.json(
       ApiResponseHelper.success({

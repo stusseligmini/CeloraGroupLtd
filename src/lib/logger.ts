@@ -1,5 +1,10 @@
 /**
  * Centralized logging utility for the application
+ * 
+ * IMPORTANT: This logger explicitly does NOT support file logging.
+ * All logs are output to console only. File logging is disabled to prevent
+ * disk space issues and security concerns. Use external log aggregation
+ * services (e.g., Azure Application Insights) for persistent logging.
  */
 
 import { maskPII } from './dataMasking';

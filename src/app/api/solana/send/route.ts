@@ -29,15 +29,18 @@ export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
   
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
 
     // Check idempotency key
-    const idempotencyCheck = await checkIdempotency(request, userId);
-    if (idempotencyCheck?.cached && idempotencyCheck.response) {
-      return idempotencyCheck.response;
+    const idempotencyKey = request.headers.get('idempotency-key');
+    if (idempotencyKey) {
+      const idempotencyCheck = await checkIdempotency(idempotencyKey, userId);
+      if (idempotencyCheck.isDuplicate && idempotencyCheck.previousResponse) {
+        return NextResponse.json(idempotencyCheck.previousResponse);
+      }
     }
 
     // Validate request body
@@ -94,17 +97,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = successResponse({
+    const responseData = {
       signature: result.signature,
       slot: result.slot,
       amount: amount.toString(),
       toAddress,
       priorityLevel,
       casinoId: casinoId || null,
-    }, 200, requestId);
+    };
+    
+    const response = successResponse(responseData, 200, requestId);
 
     // Store idempotency key
-    await storeIdempotency(request, response, userId);
+    if (idempotencyKey) {
+      await storeIdempotency(idempotencyKey, userId, responseData);
+    }
 
     logger.info('Solana transaction sent', {
       userId,

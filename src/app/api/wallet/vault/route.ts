@@ -21,7 +21,7 @@ const prisma = new PrismaClient();
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
@@ -187,7 +187,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),

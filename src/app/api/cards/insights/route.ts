@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID();
   
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
   
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         recommendation: body.recommendation || null,
         amount: body.amount || null,
         category: body.category || null,
-        metadata: body.metadata || null,
+        metadata: body.metadata ? JSON.parse(JSON.stringify(body.metadata)) : undefined,
         insightDate: new Date(),
       },
     });
@@ -127,7 +127,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const params = await context.params;
     const { id } = validateParams(params, IdParamSchema);
     
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }

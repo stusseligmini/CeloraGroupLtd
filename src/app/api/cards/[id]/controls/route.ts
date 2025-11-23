@@ -9,6 +9,7 @@ import { logError } from '@/lib/logger';
 import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
 import { CardControlsUpdateSchema, CardControlsMCCActionSchema, CardControlsResponseSchema, IdParamSchema } from '@/lib/validation/schemas';
 import { validateBody, validateParams, ValidationError, validationErrorResponse, errorResponse, successResponse } from '@/lib/validation/validate';
+import { ApiResponseHelper, HttpStatusCode } from '@/types/api';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const params = await context.params;
     const { id } = validateParams(params, IdParamSchema);
     
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const params = await context.params;
     const { id } = validateParams(params, IdParamSchema);
     
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const params = await context.params;
     const { id } = validateParams(params, IdParamSchema);
     
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }

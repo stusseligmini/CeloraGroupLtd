@@ -101,6 +101,13 @@ const nextConfig = {
 
   // Webpack configuration for better module resolution and performance
   webpack: (config, { isServer, dev }) => {
+    // Enable WebAssembly support for tiny-secp256k1
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+      layers: true,
+    };
+
     // Optimize for client-side bundles
     if (!isServer) {
       config.resolve.fallback = {

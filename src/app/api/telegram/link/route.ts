@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
   
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }

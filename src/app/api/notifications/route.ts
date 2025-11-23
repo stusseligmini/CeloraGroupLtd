@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     // Get userId from JWT token
     const { getUserIdFromRequest } = await import('@/lib/auth/serverAuth');
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       const response = errorResponse(
         'UNAUTHORIZED',

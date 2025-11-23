@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 export async function GET(request: NextRequest) {
   let userId: string | null = null;
   try {
-    userId = getUserIdFromRequest(request);
+    userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   let userId: string | null = null;
   try {
-    userId = getUserIdFromRequest(request);
+    userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),

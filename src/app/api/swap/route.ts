@@ -19,15 +19,18 @@ export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
   
   try {
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) {
       return errorResponse('UNAUTHORIZED', 'User ID is required', 401, undefined, requestId);
     }
 
     // Check idempotency key (for POST requests)
-    const idempotencyCheck = await checkIdempotency(request, userId);
-    if (idempotencyCheck?.cached && idempotencyCheck.response) {
-      return idempotencyCheck.response;
+    const idempotencyKey = request.headers.get('idempotency-key');
+    if (idempotencyKey) {
+      const idempotencyCheck = await checkIdempotency(idempotencyKey, userId);
+      if (idempotencyCheck.isDuplicate && idempotencyCheck.previousResponse) {
+        return NextResponse.json(idempotencyCheck.previousResponse);
+      }
     }
 
     // Validate request body
@@ -117,7 +120,9 @@ export async function POST(request: NextRequest) {
     const response = successResponse(validatedResponse, 200, requestId);
     
     // Store idempotency key for future requests
-    await storeIdempotency(request, response, userId);
+    if (idempotencyKey) {
+      await storeIdempotency(idempotencyKey, userId, response);
+    }
 
     return response;
   } catch (error) {

@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Get card and validate
     const card = await prisma.card.findUnique({
-      where: { id: cardId },
+      where: { id: body.cardId },
       include: {
         wallet: {
           select: {
@@ -123,14 +123,12 @@ export async function POST(request: NextRequest) {
     if (card.isDisposable && card.lastUsedAt) {
       // Auto-cancel disposable card after first use
       await prisma.card.update({
-        where: { id: cardId },
-        data: { 
+        where: { id: body.cardId },
+        data: {
           status: 'cancelled',
           cancelledAt: new Date(),
         },
-      });
-
-      const response = CardAuthorizationResponseSchema.parse({
+      });      const response = CardAuthorizationResponseSchema.parse({
         approved: false,
         declineReason: 'DISPOSABLE_CARD_USED',
         message: 'Disposable card already used',

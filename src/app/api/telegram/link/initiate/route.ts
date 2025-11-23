@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   let userId: string | null = null;
   try {
-    userId = getUserIdFromRequest(request);
+    userId = await getUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json(
         ApiResponseHelper.error('Unauthorized', 'UNAUTHORIZED'),

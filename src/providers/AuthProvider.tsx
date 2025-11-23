@@ -22,6 +22,7 @@ export type AuthUser = {
   id: string;
   email: string | null;
   isAnonymous: boolean;
+  username?: string | null;
   metadata?: Record<string, unknown>;
 };
 

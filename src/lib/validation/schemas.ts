@@ -496,7 +496,7 @@ export const BudgetSummaryResponseSchema = z.object({
 });
 
 export const CreateSpendingLimitRequestSchema = z.object({
-  limitType: z.enum(['daily', 'weekly', 'monthly', 'category']),
+  limitType: z.enum(['daily', 'weekly', 'monthly', 'per_transaction']),
   amount: z.number().positive(),
   walletId: z.string().uuid().optional(),
   cardId: z.string().uuid().optional(),

@@ -1,4 +1,3 @@
-import { callPlatformApi } from './platformClient';
 import { getCachedJson, setCachedJson } from '../cache/redisCache';
 import { WalletHolding, WalletSummary } from '@/types/api';
 

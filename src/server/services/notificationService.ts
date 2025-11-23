@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import { NotificationItem } from '@/types/api';
-import { callPlatformApi } from './platformClient';
 import { PrismaClient } from '@prisma/client';
 import { TelegramBotClient } from '../telegram/client';
 import { logger } from '@/lib/logger';

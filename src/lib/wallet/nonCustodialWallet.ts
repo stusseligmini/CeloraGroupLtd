@@ -6,11 +6,8 @@
 
 import { mnemonicToSeedSync, generateMnemonic, validateMnemonic, mnemonicToEntropy, entropyToMnemonic } from 'bip39';
 import { HDKey } from '@scure/bip32';
-import { sha256 as sha256hash } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha256';
 import { ethers } from 'ethers';
-
-// Rename sha256 to avoid conflict with bitcoinjs-lib
-const sha256 = sha256hash;
 import { Keypair } from '@solana/web3.js';
 import * as bitcoin from 'bitcoinjs-lib';
 import { ECPairFactory } from 'ecpair';

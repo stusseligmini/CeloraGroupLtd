@@ -1,19 +1,7 @@
 /**
- * Application Insights Telemetry Module
- * 
- * Provides client and server-side telemetry tracking with:
- * - Custom traces for auth events, API calls, errors
- * - Performance metrics (p95, p99 latencies)
- * - User behavior tracking
- * - Sampling and retention policies
+ * Vercel Analytics Telemetry Module
+ * Simplified telemetry without Azure Application Insights
  */
-
-import { ApplicationInsights } from '@microsoft/applicationinsights-web';
-import { ReactPlugin } from '@microsoft/applicationinsights-react-js';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface TelemetryEvent {
   name: string;
@@ -42,418 +30,104 @@ export interface TelemetryMetric {
   properties?: Record<string, string>;
 }
 
-// ============================================================================
-// Configuration
-// ============================================================================
-
-const INSTRUMENTATION_KEY = process.env.NEXT_PUBLIC_APPINSIGHTS_INSTRUMENTATION_KEY || '';
-const CONNECTION_STRING = process.env.NEXT_PUBLIC_APPINSIGHTS_CONNECTION_STRING || '';
-
-// Sampling configuration
-const SAMPLING_PERCENTAGE = parseInt(process.env.NEXT_PUBLIC_APPINSIGHTS_SAMPLING_PERCENTAGE || '100', 10);
-
-// Feature flags
-const ENABLE_AUTO_TRACKING = process.env.NEXT_PUBLIC_APPINSIGHTS_AUTO_TRACKING !== 'false';
 const ENABLE_DEBUG = process.env.NODE_ENV === 'development';
 
-// ============================================================================
-// Client-side Application Insights
-// ============================================================================
-
-let appInsights: ApplicationInsights | null = null;
-let reactPlugin: ReactPlugin | null = null;
-
-/**
- * Initialize Application Insights for client-side tracking
- */
-export function initializeAppInsights(): ApplicationInsights | null {
-  if (typeof window === 'undefined') {
-    console.warn('[AppInsights] Cannot initialize on server-side');
-    return null;
+export function initializeAppInsights(): null {
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry] Initialized (console logging mode)');
   }
+  return null;
+}
 
-  if (appInsights) {
-    return appInsights;
-  }
+export function getReactPlugin(): null {
+  return null;
+}
 
-  if (!INSTRUMENTATION_KEY && !CONNECTION_STRING) {
-    console.warn('[AppInsights] Missing instrumentation key or connection string');
-    return null;
-  }
-
-  try {
-    reactPlugin = new ReactPlugin();
-
-    appInsights = new ApplicationInsights({
-      config: {
-        instrumentationKey: INSTRUMENTATION_KEY,
-        connectionString: CONNECTION_STRING,
-        enableAutoRouteTracking: ENABLE_AUTO_TRACKING,
-        enableRequestHeaderTracking: true,
-        enableResponseHeaderTracking: true,
-        enableCorsCorrelation: true,
-        correlationHeaderExcludedDomains: ['*.queue.core.windows.net'],
-        disableFetchTracking: false,
-        disableAjaxTracking: false,
-        disableExceptionTracking: false,
-        enableUnhandledPromiseRejectionTracking: true,
-        samplingPercentage: SAMPLING_PERCENTAGE,
-        maxBatchInterval: 15000,
-        maxBatchSizeInBytes: 10000,
-        extensionConfig: {
-          [reactPlugin.identifier]: {
-            debug: ENABLE_DEBUG,
-          },
-        },
-      },
-    });
-
-    appInsights.loadAppInsights();
-
-    // Add custom telemetry initializer
-    appInsights.addTelemetryInitializer((envelope) => {
-      envelope.tags = envelope.tags || [];
-      envelope.tags['ai.cloud.role'] = 'celora-pwa';
-      envelope.tags['ai.cloud.roleInstance'] = 'client';
-      
-      // Add custom properties
-      if (envelope.baseData) {
-        envelope.baseData.properties = {
-          ...envelope.baseData.properties,
-          appVersion: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
-          environment: process.env.NEXT_PUBLIC_ENVIRONMENT || 'development',
-        };
-      }
-
-      return true;
-    });
-
-    if (ENABLE_DEBUG) {
-      console.log('[AppInsights] Initialized successfully');
-    }
-
-    return appInsights;
-  } catch (error) {
-    console.error('[AppInsights] Initialization failed:', error);
-    return null;
+export function trackEvent({ name, properties, measurements }: TelemetryEvent): void {
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry Event]', name, { properties, measurements });
   }
 }
 
-/**
- * Get the Application Insights instance
- */
-export function getAppInsights(): ApplicationInsights | null {
-  return appInsights;
+export function trackError({ error, properties, severityLevel }: TelemetryError): void {
+  console.error('[Telemetry Error]', error, { properties, severityLevel });
 }
 
-/**
- * Get the React plugin for Application Insights
- */
-export function getReactPlugin(): ReactPlugin | null {
-  return reactPlugin;
-}
-
-// ============================================================================
-// Telemetry Tracking Functions
-// ============================================================================
-
-/**
- * Track a custom event
- */
-export function trackEvent(event: TelemetryEvent): void {
-  if (!appInsights) {
-    if (ENABLE_DEBUG) {
-      console.log('[AppInsights] Event:', event);
-    }
-    return;
-  }
-
-  try {
-    appInsights.trackEvent(
-      { 
-        name: event.name,
-        properties: event.properties,
-        measurements: event.measurements
-      }
-    );
-  } catch (error) {
-    console.error('[AppInsights] Failed to track event:', error);
+export function trackTrace({ message, properties, severityLevel }: TelemetryTrace): void {
+  if (ENABLE_DEBUG || severityLevel === 'Error' || severityLevel === 'Critical') {
+    console.log('[Telemetry Trace]', message, { properties, severityLevel });
   }
 }
 
-/**
- * Track an error/exception
- */
-export function trackError(telemetryError: TelemetryError): void {
-  if (!appInsights) {
-    if (ENABLE_DEBUG) {
-      console.error('[AppInsights] Error:', telemetryError);
-    }
-    return;
-  }
-
-  try {
-    appInsights.trackException({
-      exception: telemetryError.error,
-      properties: telemetryError.properties,
-      severityLevel: getSeverityLevel(telemetryError.severityLevel),
-    });
-  } catch (error) {
-    console.error('[AppInsights] Failed to track error:', error);
-  }
-}
-
-/**
- * Track a trace message
- */
-export function trackTrace(trace: TelemetryTrace): void {
-  if (!appInsights) {
-    if (ENABLE_DEBUG) {
-      console.log('[AppInsights] Trace:', trace);
-    }
-    return;
-  }
-
-  try {
-    appInsights.trackTrace({
-      message: trace.message,
-      properties: trace.properties,
-      severityLevel: getSeverityLevel(trace.severityLevel),
-    });
-  } catch (error) {
-    console.error('[AppInsights] Failed to track trace:', error);
-  }
-}
-
-/**
- * Track a custom metric
- */
 export function trackMetric(metric: TelemetryMetric): void {
-  if (!appInsights) {
-    if (ENABLE_DEBUG) {
-      console.log('[AppInsights] Metric:', metric);
-    }
-    return;
-  }
-
-  try {
-    appInsights.trackMetric(
-      {
-        name: metric.name,
-        average: metric.average,
-        sampleCount: metric.sampleCount,
-        min: metric.min,
-        max: metric.max,
-      },
-      metric.properties
-    );
-  } catch (error) {
-    console.error('[AppInsights] Failed to track metric:', error);
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry Metric]', metric);
   }
 }
 
-/**
- * Track page view (manual)
- */
-export function trackPageView(name?: string, uri?: string, properties?: Record<string, string>): void {
-  if (!appInsights) {
-    return;
-  }
-
-  try {
-    appInsights.trackPageView({
-      name,
-      uri,
-      properties,
-    });
-  } catch (error) {
-    console.error('[AppInsights] Failed to track page view:', error);
+export function trackPageView(name?: string): void {
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry PageView]', name || (typeof window !== 'undefined' ? window?.location?.pathname : 'unknown'));
   }
 }
 
-/**
- * Set authenticated user context
- */
-export function setAuthenticatedUser(userId: string, accountId?: string): void {
-  if (!appInsights) {
-    return;
-  }
+export function trackAuthSuccess(userId: string, provider: string): void {
+  trackEvent({
+    name: TelemetryEvents.AUTH_SUCCESS,
+    properties: { userId, provider },
+  });
+}
 
-  try {
-    appInsights.setAuthenticatedUserContext(userId, accountId, true);
-    if (ENABLE_DEBUG) {
-      console.log('[AppInsights] Authenticated user set:', userId);
-    }
-  } catch (error) {
-    console.error('[AppInsights] Failed to set authenticated user:', error);
+export function trackAuthFailure(error: string, provider: string): void {
+  trackEvent({
+    name: TelemetryEvents.AUTH_FAILURE,
+    properties: { error, provider },
+  });
+}
+
+export function setAuthenticatedUser(userId: string): void {
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry] Set authenticated user:', userId);
   }
 }
 
-/**
- * Clear authenticated user context
- */
 export function clearAuthenticatedUser(): void {
-  if (!appInsights) {
-    return;
-  }
-
-  try {
-    appInsights.clearAuthenticatedUserContext();
-    if (ENABLE_DEBUG) {
-      console.log('[AppInsights] Authenticated user cleared');
-    }
-  } catch (error) {
-    console.error('[AppInsights] Failed to clear authenticated user:', error);
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry] Clear authenticated user');
   }
 }
 
-/**
- * Flush telemetry data immediately
- */
-export function flushTelemetry(): void {
-  if (!appInsights) {
-    return;
-  }
-
-  try {
-    appInsights.flush();
-  } catch (error) {
-    console.error('[AppInsights] Failed to flush telemetry:', error);
+export function startTrackEvent(name: string): void {
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry] Start tracking event:', name);
   }
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-function getSeverityLevel(level?: string): number {
-  switch (level) {
-    case 'Verbose':
-      return 0;
-    case 'Information':
-      return 1;
-    case 'Warning':
-      return 2;
-    case 'Error':
-      return 3;
-    case 'Critical':
-      return 4;
-    default:
-      return 1; // Information
+export function stopTrackEvent(name: string, properties?: Record<string, string>): void {
+  if (ENABLE_DEBUG) {
+    console.log('[Telemetry] Stop tracking event:', name, properties);
   }
 }
 
-// ============================================================================
-// Pre-defined Event Names
-// ============================================================================
-
-export const TelemetryEvents = {
-  // Auth events
-  AUTH_LOGIN_SUCCESS: 'auth.login.success',
-  AUTH_LOGIN_FAILURE: 'auth.login.failure',
-  AUTH_LOGOUT: 'auth.logout',
-  AUTH_TOKEN_REFRESH: 'auth.token.refresh',
-  AUTH_TOKEN_EXPIRED: 'auth.token.expired',
-  AUTH_SESSION_TIMEOUT: 'auth.session.timeout',
-  
-  // API events
-  API_REQUEST_START: 'api.request.start',
-  API_REQUEST_SUCCESS: 'api.request.success',
-  API_REQUEST_FAILURE: 'api.request.failure',
-  API_REQUEST_TIMEOUT: 'api.request.timeout',
-  
-  // Wallet events
-  WALLET_CREATED: 'wallet.created',
-  WALLET_VIEWED: 'wallet.viewed',
-  WALLET_TRANSACTION: 'wallet.transaction',
-  
-  // Notification events
-  NOTIFICATION_RECEIVED: 'notification.received',
-  NOTIFICATION_CLICKED: 'notification.clicked',
-  NOTIFICATION_DISMISSED: 'notification.dismissed',
-  
-  // Error events
-  ERROR_BOUNDARY: 'error.boundary',
-  ERROR_NETWORK: 'error.network',
-  ERROR_VALIDATION: 'error.validation',
-  
-  // Performance events
-  PERFORMANCE_SLOW_API: 'performance.slow.api',
-  PERFORMANCE_SLOW_RENDER: 'performance.slow.render',
-} as const;
-
-// ============================================================================
-// Convenience Functions for Common Events
-// ============================================================================
-
-/**
- * Track authentication success
- */
-export function trackAuthSuccess(userId: string, method: string): void {
-  trackEvent({
-    name: TelemetryEvents.AUTH_LOGIN_SUCCESS,
-    properties: {
-      userId,
-      method,
-      timestamp: new Date().toISOString(),
-    },
-  });
-  setAuthenticatedUser(userId);
+export function flush(): Promise<void> {
+  return Promise.resolve();
 }
 
-/**
- * Track authentication failure
- */
-export function trackAuthFailure(error: string, method: string): void {
-  trackEvent({
-    name: TelemetryEvents.AUTH_LOGIN_FAILURE,
-    properties: {
-      error,
-      method,
-      timestamp: new Date().toISOString(),
-    },
-  });
-}
-
-/**
- * Track API request with timing
- */
-export function trackApiRequest(
-  endpoint: string,
-  method: string,
-  statusCode: number,
-  duration: number,
-  success: boolean
-): void {
-  const eventName = success
-    ? TelemetryEvents.API_REQUEST_SUCCESS
-    : TelemetryEvents.API_REQUEST_FAILURE;
-
-  trackEvent({
-    name: eventName,
-    properties: {
-      endpoint,
-      method,
-      statusCode: statusCode.toString(),
-      timestamp: new Date().toISOString(),
-    },
-    measurements: {
-      duration,
-    },
-  });
-
-  // Track slow API calls
-  if (duration > 2000) {
-    trackEvent({
-      name: TelemetryEvents.PERFORMANCE_SLOW_API,
-      properties: {
-        endpoint,
-        method,
-        statusCode: statusCode.toString(),
-      },
-      measurements: {
-        duration,
-      },
-    });
-  }
+export enum TelemetryEvents {
+  AUTH_SUCCESS = 'auth.success',
+  AUTH_FAILURE = 'auth.failure',
+  AUTH_LOGOUT = 'auth.logout',
+  AUTH_TOKEN_REFRESH = 'auth.token_refresh',
+  WALLET_CREATED = 'wallet.created',
+  WALLET_IMPORTED = 'wallet.imported',
+  TRANSACTION_INITIATED = 'transaction.initiated',
+  TRANSACTION_COMPLETED = 'transaction.completed',
+  TRANSACTION_FAILED = 'transaction.failed',
+  CARD_CREATED = 'card.created',
+  CARD_AUTHORIZATION = 'card.authorization',
+  CARD_DECLINED = 'card.declined',
+  API_CALL = 'api.call',
+  API_ERROR = 'api.error',
+  PAGE_VIEW = 'page.view',
+  ERROR_BOUNDARY = 'error.boundary',
 }

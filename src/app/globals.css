@@ -28,26 +28,26 @@
 :root {
   --background: #0a0e17;
   --foreground: #ffffff;
-  --cyan-primary: #0af5d3;  /* Lysere cyan/grønn */
-  --cyan-secondary: #09e2c2; /* Mellomtønene cyan/grønn */
-  --cyan-accent: #02fada;    /* Sterkt cyan/grønn */
-  --purple-glow: #e31aff;    /* Lilla neonlys fra logoen */
-  --purple-accent: #d31aed;  /* Mellomtønene lilla */
-  --dark-surface: #0e1624;   /* Mørkere bakgrunn */
-  --dark-card: #151d2e;      /* Mørk kortbakgrunn */
-  --dark-border: #1e2a40;    /* Mørk kantfarge */
-  --neon-glow: 0 0 10px #0af5d3, 0 0 20px rgba(10, 245, 211, 0.5);
-  --neon-text-shadow: 0 0 5px rgba(10, 245, 211, 0.8), 0 0 10px rgba(10, 245, 211, 0.4);
-  --neon-purple-glow: 0 0 10px #e31aff, 0 0 20px rgba(227, 26, 255, 0.5);
-  --neon-purple-text-shadow: 0 0 5px rgba(227, 26, 255, 0.8), 0 0 10px rgba(227, 26, 255, 0.4);
+  --cyan-primary: #00f5d4;  /* Celora cyan-green */
+  --cyan-secondary: #00d4b8; /* Mellomtone cyan-green */
+  --cyan-accent: #00ffe6;    /* Lysere cyan-green */
+  --purple-glow: #7c3aed;    /* Lilla fra Celora logo */
+  --purple-accent: #9333ea;  /* Lysere lilla accent */
+  --dark-surface: #1a1f2e;   /* Celora grey surface */
+  --dark-card: #1f2937;      /* Grey card background */
+  --dark-border: #374151;    /* Grey border */
+  --neon-glow: 0 0 10px #00f5d4, 0 0 20px rgba(0, 245, 212, 0.5);
+  --neon-text-shadow: 0 0 5px rgba(0, 245, 212, 0.8), 0 0 10px rgba(0, 245, 212, 0.4);
+  --neon-purple-glow: 0 0 10px #7c3aed, 0 0 20px rgba(124, 58, 237, 0.5);
+  --neon-purple-text-shadow: 0 0 5px rgba(124, 58, 237, 0.8), 0 0 10px rgba(124, 58, 237, 0.4);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   background-image: 
-    radial-gradient(circle at 20% 30%, rgba(10, 245, 211, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(227, 26, 255, 0.1) 0%, transparent 50%);
+    radial-gradient(circle at 20% 30%, rgba(0, 245, 212, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(124, 58, 237, 0.08) 0%, transparent 50%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   min-height: 100vh;
   line-height: 1.6;
@@ -61,8 +61,8 @@ body {
 }
 
 .bg-card {
-  background: rgba(30, 42, 59, 0.7);
-  border: 1px solid rgba(10, 245, 211, 0.3);
+  background: rgba(26, 31, 46, 0.7);
+  border: 1px solid rgba(0, 245, 212, 0.3);
   box-shadow: var(--neon-glow);
   backdrop-filter: blur(10px);
   border-radius: 8px;
@@ -101,8 +101,8 @@ body {
 
 /* Cyberpunk card styles */
 .modern-card {
-  background: rgba(30, 42, 59, 0.6);
-  border: 1px solid rgba(10, 245, 211, 0.3);
+  background: rgba(26, 31, 46, 0.6);
+  border: 1px solid rgba(0, 245, 212, 0.3);
   border-radius: 6px;
   backdrop-filter: blur(8px);
   transition: all 0.3s ease;
@@ -122,10 +122,10 @@ body {
 }
 
 .modern-card:hover {
-  border-color: rgba(10, 245, 211, 0.7);
-  background: rgba(30, 42, 59, 0.8);
+  border-color: rgba(0, 245, 212, 0.7);
+  background: rgba(26, 31, 46, 0.8);
   transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(10, 245, 211, 0.4), 0 0 30px rgba(10, 245, 211, 0.2);
+  box-shadow: 0 0 15px rgba(0, 245, 212, 0.4), 0 0 30px rgba(0, 245, 212, 0.2);
 }
 
 .modern-card:hover::before {
@@ -134,7 +134,7 @@ body {
 
 /* Cyberpunk button styles */
 .btn-primary {
-  background: linear-gradient(135deg, #0af5d3, #09e2c2);
+  background: linear-gradient(135deg, #00f5d4, #00d4b8);
   color: #0a0e17; /* Mørk tekst på lys knapp for bedre kontrast */
   font-weight: 500;
   padding: 12px 24px;
@@ -142,7 +142,7 @@ body {
   border: none;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 0 10px rgba(10, 245, 211, 0.5), inset 0 0 5px rgba(10, 245, 211, 0.5);
+  box-shadow: 0 0 10px rgba(0, 245, 212, 0.5), inset 0 0 5px rgba(0, 245, 212, 0.5);
   text-transform: uppercase;
   letter-spacing: 1px;
   position: relative;
@@ -161,9 +161,9 @@ body {
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #02fada, #0af5d3);
+  background: linear-gradient(135deg, #00ffe6, #00f5d4);
   transform: translateY(-1px);
-  box-shadow: 0 0 15px rgba(10, 245, 211, 0.7), inset 0 0 10px rgba(10, 245, 211, 0.4);
+  box-shadow: 0 0 15px rgba(0, 245, 212, 0.7), inset 0 0 10px rgba(0, 245, 212, 0.4);
   text-shadow: 0 0 5px rgba(10, 10, 10, 0.5);
 }
 
@@ -182,33 +182,33 @@ body {
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
-  box-shadow: 0 0 5px rgba(10, 245, 211, 0.3);
-  text-shadow: 0 0 3px rgba(10, 245, 211, 0.5);
+  box-shadow: 0 0 5px rgba(0, 245, 212, 0.3);
+  text-shadow: 0 0 3px rgba(0, 245, 212, 0.5);
 }
 
 .btn-outline:hover {
-  background: rgba(10, 245, 211, 0.1);
+  background: rgba(0, 245, 212, 0.1);
   color: white;
   transform: translateY(-1px);
   border-color: var(--cyan-primary);
-  box-shadow: 0 0 10px rgba(10, 245, 211, 0.5);
+  box-shadow: 0 0 10px rgba(0, 245, 212, 0.5);
   text-shadow: 0 0 5px var(--cyan-primary);
 }
 
 /* Neon glow effects */
 .subtle-glow {
-  box-shadow: 0 0 20px rgba(10, 245, 211, 0.3);
+  box-shadow: 0 0 20px rgba(0, 245, 212, 0.3);
   transition: all 0.3s ease;
 }
 
 .subtle-glow:hover {
-  box-shadow: 0 0 30px rgba(10, 245, 211, 0.6);
+  box-shadow: 0 0 30px rgba(0, 245, 212, 0.6);
 }
 
 /* Cyberpunk text styles */
 .accent-text {
   color: var(--cyan-primary);
-  text-shadow: 0 0 5px rgba(10, 245, 211, 0.8);
+  text-shadow: 0 0 5px rgba(0, 245, 212, 0.8);
   animation: neonPulse 2s infinite;
 }
 
@@ -217,7 +217,7 @@ body {
   color: var(--cyan-primary);
   text-shadow: 0 0 5px var(--cyan-primary), 
                0 0 10px var(--cyan-primary), 
-               0 0 20px rgba(10, 245, 211, 0.5);
+               0 0 20px rgba(0, 245, 212, 0.5);
   letter-spacing: 2px;
   animation: neonPulse 3s infinite;
 }
@@ -226,7 +226,7 @@ body {
   color: var(--purple-glow);
   text-shadow: 0 0 5px var(--purple-glow), 
                0 0 10px var(--purple-glow), 
-               0 0 20px rgba(227, 26, 255, 0.5);
+               0 0 20px rgba(124, 58, 237, 0.5);
   letter-spacing: 2px;
   animation: neonPulse 3s infinite;
 }
@@ -237,8 +237,9 @@ body {
   letter-spacing: 3px;
   background: linear-gradient(to right, var(--purple-glow), var(--cyan-primary));
   -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
-  text-shadow: 0 0 10px rgba(10, 245, 211, 0.5), 0 0 15px rgba(227, 26, 255, 0.3);
+  filter: drop-shadow(0 0 10px rgba(0, 245, 212, 0.5)) drop-shadow(0 0 15px rgba(124, 58, 237, 0.3));
 }
 
 /* Cyberpunk gradient backgrounds */
@@ -254,7 +255,7 @@ body {
 /* Form inputs styling */
 .neon-input {
   background: rgba(10, 14, 23, 0.7);
-  border: 1px solid rgba(10, 245, 211, 0.3);
+  border: 1px solid rgba(0, 245, 212, 0.3);
   border-radius: 4px;
   color: white;
   transition: all 0.3s ease;
@@ -262,8 +263,8 @@ body {
 
 .neon-input:focus {
   border-color: var(--cyan-primary);
-  box-shadow: 0 0 0 2px rgba(10, 245, 211, 0.2), 0 0 10px rgba(10, 245, 211, 0.4);
-  background: rgba(21, 28, 44, 0.7);
+  box-shadow: 0 0 0 2px rgba(0, 245, 212, 0.2), 0 0 10px rgba(0, 245, 212, 0.4);
+  background: rgba(26, 31, 46, 0.7);
   outline: none;
 }
 
@@ -437,8 +438,8 @@ a, button {
   flex-direction: column;
   min-height: 100vh;
   padding: 24px;
-  background: radial-gradient(circle at top, rgba(10, 245, 211, 0.12), transparent 55%),
-    radial-gradient(circle at bottom, rgba(227, 26, 255, 0.08), transparent 60%);
+  background: radial-gradient(circle at top, rgba(0, 245, 212, 0.12), transparent 55%),
+    radial-gradient(circle at bottom, rgba(124, 58, 237, 0.08), transparent 60%);
 }
 
 .cel-shell--extension {

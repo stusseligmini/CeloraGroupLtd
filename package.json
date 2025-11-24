@@ -44,7 +44,7 @@
     "@prisma/client": "^5.22.0",
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
-    "@solana/spl-token": "^0.4.14",
+    "@solana/spl-token": "^0.1.8",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-phantom": "^0.9.28",
     "@solana/wallet-adapter-react": "^0.15.39",

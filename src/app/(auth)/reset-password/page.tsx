@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function ResetPasswordPage() {
   const { triggerPasswordReset, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -14,11 +15,17 @@ export default function ResetPasswordPage() {
     event.preventDefault();
     setError(null);
     setSuccess(null);
-    const result = await triggerPasswordReset();
+    
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+    
+    const result = await triggerPasswordReset(email);
     if (!result.success && result.error) {
       setError(result.error);
     } else {
-      setSuccess('Redirecting to Azure AD B2C password reset…');
+      setSuccess('Password reset email sent. Check your inbox.');
     }
   };
 
@@ -51,12 +58,27 @@ export default function ResetPasswordPage() {
           )}
 
           <form onSubmit={handleReset} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-gray-800/50 border border-cyan-400/30 rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+                placeholder="your@email.com"
+              />
+            </div>
+            
             <button
               type="submit"
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-mono font-semibold py-3 rounded-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Opening reset flow…' : 'Initiate password reset'}
+              {isLoading ? 'Sending reset email…' : 'Send reset email'}
             </button>
           </form>
 

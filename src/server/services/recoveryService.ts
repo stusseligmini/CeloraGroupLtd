@@ -61,7 +61,7 @@ export class RecoveryService {
       where: {
         userId,
         blockchain,
-        encryptedPrivateKey: { not: null },
+        mnemonicHash: { not: null },
       },
       orderBy: [
         { isDefault: 'desc' },
@@ -99,16 +99,17 @@ export class RecoveryService {
     method: string,
     args: any[]
   ): Promise<string> {
-    if (!signerWallet.encryptedPrivateKey) {
+    if (!signerWallet.mnemonicHash) {
       throw new Error('Signer wallet missing encrypted private key');
     }
 
+    // TODO: Implement mnemonic-based key derivation for signing
+    throw new Error('Guardian operations require implementing mnemonic key derivation');
+    
+    /*
     const client = this.getEvmClientOrThrow(blockchain);
     const provider = await client.getProvider();
-    const signer = new ethers.Wallet(
-      decrypt(signerWallet.encryptedPrivateKey),
-      provider
-    );
+    const signer = new ethers.Wallet(privateKey, provider);
 
     const contract = await this.getGuardianRegistryContract(blockchain, signer);
     const tx = await contract[method](...args);
@@ -122,8 +123,8 @@ export class RecoveryService {
       receipt,
       method
     );
-
-    return tx.hash;
+    return txHash;
+    */
   }
 
   private async recordGuardianTransaction(
@@ -188,7 +189,7 @@ export class RecoveryService {
       return;
     }
 
-    if (!wallet.encryptedPrivateKey || !wallet.address) {
+    if (!wallet.mnemonicHash || !wallet.address) {
       throw new Error('Wallet missing private key for guardian registration');
     }
 
@@ -309,7 +310,7 @@ export class RecoveryService {
       let onChainTxHash: string | undefined;
 
       if (this.canUseOnChain(wallet.blockchain)) {
-        if (!wallet.encryptedPrivateKey) {
+        if (!wallet.mnemonicHash) {
           throw new Error('Wallet missing encrypted key for on-chain recovery initiation');
         }
 
@@ -439,7 +440,7 @@ export class RecoveryService {
       );
 
       if (this.canUseOnChain(wallet.blockchain)) {
-        if (!guardianWallet?.encryptedPrivateKey) {
+        if (!guardianWallet?.mnemonicHash) {
           throw new Error('Guardian wallet missing private key for on-chain approval');
         }
 
@@ -469,7 +470,7 @@ export class RecoveryService {
           wallet,
           storedHash,
           this.normalizeAddress(storedNewOwner),
-          guardianWallet && guardianWallet.encryptedPrivateKey ? guardianWallet : null
+          guardianWallet && guardianWallet.mnemonicHash ? guardianWallet : null
         );
       }
 
@@ -600,7 +601,7 @@ export class RecoveryService {
           guardianId,
         });
       } else {
-        if (!guardianRecord.wallet.encryptedPrivateKey) {
+        if (!guardianRecord.wallet.mnemonicHash) {
           throw new Error('Wallet missing encrypted key for guardian removal');
         }
 

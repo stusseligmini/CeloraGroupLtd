@@ -27,7 +27,7 @@ export default function SwapInterface() {
     const fetchWallets = async () => {
       setLoadingWallets(true);
       try {
-        const response = await axios.get<{ success: boolean; data: { wallets: Wallet[] } }>('/api/wallet/list');
+        const response = await axios.get('/api/wallet/list') as { data: { success: boolean; data: { wallets: Wallet[] } } };
         if (response.data.success && response.data.data.wallets) {
           const walletList = response.data.data.wallets;
           setWallets(walletList);

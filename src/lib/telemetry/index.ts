@@ -7,7 +7,6 @@
 // Client-side telemetry
 export {
   initializeAppInsights,
-  getAppInsights,
   getReactPlugin,
   trackEvent,
   trackError,
@@ -16,11 +15,9 @@ export {
   trackPageView,
   setAuthenticatedUser,
   clearAuthenticatedUser,
-  flushTelemetry,
   TelemetryEvents,
   trackAuthSuccess,
   trackAuthFailure,
-  trackApiRequest,
   type TelemetryEvent,
   type TelemetryError,
   type TelemetryTrace,

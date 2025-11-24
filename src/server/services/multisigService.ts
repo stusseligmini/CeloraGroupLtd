@@ -366,7 +366,7 @@ export class MultiSigService {
         userId,
         blockchain,
         walletType: 'standard',
-        encryptedPrivateKey: { not: null },
+        mnemonicHash: { not: null },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -392,17 +392,20 @@ export class MultiSigService {
     }
 
     const fundingWallet = await this.getFundingWallet(userId, blockchain);
-    if (!fundingWallet?.encryptedPrivateKey || !fundingWallet.address) {
+    if (!fundingWallet?.mnemonicHash || !fundingWallet.address) {
       throw new Error('No funded wallet available to deploy multi-sig contract');
     }
 
+    // TODO: Implement mnemonic-based key derivation
+    // For now, return null to indicate on-chain deployment not supported yet
+    console.warn('[MultiSig] On-chain deployment requires mnemonic key derivation - not implemented yet');
+    return null;
+
     const client = this.getEvmClientOrThrow(blockchain);
     const provider = await client.getProvider();
-    const deployer = new ethers.Wallet(
-      decrypt(fundingWallet.encryptedPrivateKey),
-      provider
-    );
+    // const deployer = new ethers.Wallet(privateKey, provider);
 
+    /*
     const config = getMultiSigOnChainConfig(blockchain);
     const owners = signers.map(s => this.normalizeAddress(s.address));
     const initializer = buildSafeInitializer(
@@ -443,6 +446,7 @@ export class MultiSigService {
     );
 
     return deployedAddress;
+    */
   }
 
   private async executePendingTransactionOnChain(
@@ -497,7 +501,7 @@ export class MultiSigService {
       where: {
         address: { in: normalizedSigners },
         blockchain: pendingTx.blockchain,
-        encryptedPrivateKey: { not: null },
+        mnemonicHash: { not: null },
       },
     });
 
@@ -512,12 +516,16 @@ export class MultiSigService {
         w => this.normalizeAddress(w.address) === signer
       );
 
-      if (!signerWallet?.encryptedPrivateKey) {
-        throw new Error(`Missing encrypted key for signer ${signer}`);
+      if (!signerWallet?.mnemonicHash) {
+        throw new Error(`Missing mnemonic for signer ${signer}`);
       }
+      
+      // TODO: Implement mnemonic-based key derivation
+      throw new Error('Multi-sig signing requires implementing mnemonic key derivation');
 
+      /*
       const walletSigner = new ethers.Wallet(
-        decrypt(signerWallet.encryptedPrivateKey),
+        privateKey,
         provider
       );
 
@@ -531,22 +539,24 @@ export class MultiSigService {
         signer: walletSigner.address,
         signature,
       });
+      */
     }
 
+    // TODO: Implement mnemonic-based key derivation
+    throw new Error('Multi-sig on-chain execution requires implementing mnemonic key derivation');
+
+    /*
     const packedSignatures = packSafeSignatures(signaturePayloads);
 
     const executorWalletRecord = signerWallets.find(
       w => this.normalizeAddress(w.address) === normalizedSigners[0]
     );
 
-    if (!executorWalletRecord?.encryptedPrivateKey) {
+    if (!executorWalletRecord?.mnemonicHash) {
       throw new Error('Unable to load executor wallet for multi-sig transaction');
     }
-
-    const executor = new ethers.Wallet(
-      decrypt(executorWalletRecord.encryptedPrivateKey),
-      provider
-    );
+    
+    const executor = new ethers.Wallet(privateKey, provider);
 
     const txResponse = await (safeContract as any)
       .connect(executor)
@@ -579,6 +589,7 @@ export class MultiSigService {
     );
 
     return { txHash: txResponse.hash };
+    */
   }
 
   private async recordContractDeployment(

@@ -4,6 +4,15 @@ import { WalletHolding, WalletSummary } from '@/types/api';
 const CACHE_KEY_PREFIX = 'wallet:summary:';
 const CACHE_TTL_MS = 60_000; // 1 minute cache
 
+// TODO: Implement platform API client
+async function callPlatformApi<T>(
+  config: { path: string; method: string; userToken?: string },
+  fallbackFn: () => Promise<T>
+): Promise<T> {
+  // For now, always use fallback
+  return fallbackFn();
+}
+
 const FALLBACK_SUMMARY: WalletSummary = {
   totalBalance: 0,
   currency: 'USD',
@@ -46,8 +55,7 @@ export async function getWalletSummary(userId: string | null, userToken: string 
     {
       path: '/wallets/summary',
       method: 'GET',
-      headers,
-      userToken,
+      userToken: userToken ?? undefined,
     },
     async () => FALLBACK_SUMMARY
   );

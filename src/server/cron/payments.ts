@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
-import { broadcastTransaction } from '../services/transactionService';
+// TODO: broadcastTransaction function needs to be implemented in transactionService
+// import { broadcastTransaction } from '../services/transactionService';
 import { logger } from '@/lib/logger';
 
 const prisma = new PrismaClient();
@@ -70,6 +71,11 @@ async function processScheduledPayments() {
             throw new Error('Wallet not found for scheduled payment');
           }
 
+          // TODO: Implement broadcastTransaction function
+          throw new Error('broadcastTransaction not yet implemented');
+          
+          // Unreachable code below (will be enabled when broadcastTransaction is implemented)
+          /* 
           const result = await broadcastTransaction({
             userId: payment.wallet.userId,
             walletId: payment.walletId,
@@ -85,6 +91,7 @@ async function processScheduledPayments() {
           }
 
           txHash = result.txHash;
+          */
 
           // Log execution
           await prisma.scheduledPaymentExecution.create({

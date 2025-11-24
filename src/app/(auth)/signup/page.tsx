@@ -7,11 +7,20 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function SignUpPage() {
   const { signUp, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSignUp = async () => {
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
-    const result = await signUp();
+    
+    if (!email || !password) {
+      setError('Please enter email and password');
+      return;
+    }
+    
+    const result = await signUp(email, password);
     if (!result.success && result.error) {
       setError(result.error);
     }
@@ -40,13 +49,46 @@ export default function SignUpPage() {
             </div>
           )}
 
-          <button
-            onClick={handleSignUp}
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 hover:from-purple-400 hover:via-pink-400 hover:to-cyan-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-mono font-semibold py-3 rounded-md transition-all"
-          >
-            {isLoading ? 'Opening Azure AD B2C…' : 'Register with Celora ID'}
-          </button>
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-gray-800/50 border border-purple-400/30 rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
+                placeholder="your@email.com"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full bg-gray-800/50 border border-purple-400/30 rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 hover:from-purple-400 hover:via-pink-400 hover:to-cyan-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-mono font-semibold py-3 rounded-md transition-all"
+            >
+              {isLoading ? 'Creating account…' : 'Create account'}
+            </button>
+          </form>
 
           <div className="text-sm text-gray-400 flex items-center justify-between">
             <span>Har du allerede konto?</span>

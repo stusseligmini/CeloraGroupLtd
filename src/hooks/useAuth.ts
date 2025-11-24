@@ -14,10 +14,10 @@ interface AuthState {
 
 interface UseAuthReturn extends AuthState {
   signIn: () => Promise<{ success: boolean; error?: string }>;
-  signUp: () => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<boolean>;
   refreshSession: () => Promise<boolean>;
-  triggerPasswordReset: () => Promise<{ success: boolean; error?: string }>;
+  triggerPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (attributes: Record<string, unknown>) => Promise<boolean>;
 }
 
@@ -46,8 +46,8 @@ export function useAuth(): UseAuthReturn {
     return { success: false, error: result.error.message };
   }, [signIn]);
 
-  const wrappedSignUp = useCallback(async () => {
-    const result = await signUp();
+  const wrappedSignUp = useCallback(async (email: string, password: string) => {
+    const result = await signUp(email, password);
 
     if (!result.error) {
       return { success: true };
@@ -78,8 +78,8 @@ export function useAuth(): UseAuthReturn {
     }
   }, [refreshSession]);
 
-  const wrappedPasswordReset = useCallback(async () => {
-    const result = await triggerPasswordReset();
+  const wrappedPasswordReset = useCallback(async (email: string) => {
+    const result = await triggerPasswordReset(email);
     if (!result.error) {
       return { success: true };
     }
@@ -87,8 +87,12 @@ export function useAuth(): UseAuthReturn {
   }, [triggerPasswordReset]);
 
   const wrappedUpdateUser = useCallback(async (attributes: Record<string, unknown>) => {
-    const result = await updateUser(attributes);
-    return !result.error;
+    try {
+      await updateUser(attributes as Partial<AuthUser>);
+      return true;
+    } catch {
+      return false;
+    }
   }, [updateUser]);
 
   const state = useMemo<AuthState>(

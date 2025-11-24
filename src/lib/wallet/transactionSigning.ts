@@ -20,7 +20,7 @@ export interface SignedTransaction {
 /**
  * Sign an EVM transaction (Ethereum, Celo, Polygon, Arbitrum, Optimism)
  */
-export function signEVMTransaction(
+export async function signEVMTransaction(
   privateKey: string,
   tx: {
     to: string;
@@ -33,7 +33,7 @@ export function signEVMTransaction(
     nonce?: number;
     chainId: number;
   }
-): SignedTransaction {
+): Promise<SignedTransaction> {
   const wallet = new ethers.Wallet(privateKey);
 
   // Prepare transaction
@@ -50,12 +50,12 @@ export function signEVMTransaction(
   if (tx.gasPrice) transaction.gasPrice = BigInt(tx.gasPrice);
   if (tx.nonce !== undefined) transaction.nonce = tx.nonce;
 
-  // Sign transaction
-  const signedTx = wallet.signTransactionSync(transaction);
+  // Sign transaction (async method)
+  const signedTx = await wallet.signTransaction(transaction);
   
   return {
-    signedTx: signedTx.serialized,
-    txHash: ethers.keccak256(ethers.getBytes(signedTx.serialized)),
+    signedTx: signedTx,
+    txHash: ethers.keccak256(signedTx),
   };
 }
 
@@ -166,7 +166,12 @@ export function signBitcoinTransaction(
 
   // Sign all inputs
   for (let i = 0; i < tx.utxos.length; i++) {
-    psbt.signInput(i, keyPair);
+    // Create a compatible keypair with Buffer publicKey for PSBT signing
+    const bufferKeyPair = {
+      ...keyPair,
+      publicKey: Buffer.from(keyPair.publicKey),
+    };
+    psbt.signInput(i, bufferKeyPair as any);
   }
 
   // Finalize
@@ -208,7 +213,6 @@ export function createEVMTransactionRequest(
     tx: {
       to,
       value: amount,
-      chainId: options.chainId,
       ...options,
     },
   };

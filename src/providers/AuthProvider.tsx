@@ -39,9 +39,13 @@ export interface AuthContextValue {
   loading: boolean;
   error: Error | null;
   signIn: () => Promise<AuthResult>;
+  signUp: (email: string, password: string) => Promise<AuthResult>;
   signInWithToken: (token: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  updateUser: (updates: Partial<AuthUser>) => Promise<void>;
+  triggerPasswordReset: (email: string) => Promise<AuthResult>;
+  confirmPasswordReset: (code: string, newPassword: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -146,6 +150,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setSessionFromFirebase]);
 
+  const signUp = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    setError(null);
+    try {
+      // TODO: Implement sign up with Firebase
+      await signInAnonymously(auth);
+      return {};
+    } catch (err) {
+      const failure = err instanceof Error ? err : new Error('Failed to sign up');
+      setError(failure);
+      return { error: failure };
+    }
+  }, []);
+
+  const triggerPasswordReset = useCallback(async (email: string): Promise<AuthResult> => {
+    setError(null);
+    try {
+      // TODO: Implement password reset with Firebase
+      return {};
+    } catch (err) {
+      const failure = err instanceof Error ? err : new Error('Failed to trigger password reset');
+      setError(failure);
+      return { error: failure };
+    }
+  }, []);
+
+  const confirmPasswordReset = useCallback(async (code: string, newPassword: string): Promise<AuthResult> => {
+    setError(null);
+    try {
+      // TODO: Implement password reset confirmation with Firebase
+      return {};
+    } catch (err) {
+      const failure = err instanceof Error ? err : new Error('Failed to confirm password reset');
+      setError(failure);
+      return { error: failure };
+    }
+  }, []);
+
+  const updateUser = useCallback(async (updates: Partial<AuthUser>) => {
+    setError(null);
+    try {
+      // TODO: Implement user update with Firebase
+      if (user) {
+        setUser({ ...user, ...updates });
+      }
+    } catch (err) {
+      const failure = err instanceof Error ? err : new Error('Failed to update user');
+      setError(failure);
+      throw failure;
+    }
+  }, [user]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -153,11 +208,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       error,
       signIn,
+      signUp,
       signInWithToken,
       signOut,
       refreshSession,
+      updateUser,
+      triggerPasswordReset,
+      confirmPasswordReset,
     }),
-    [user, session, loading, error, signIn, signInWithToken, signOut, refreshSession]
+    [user, session, loading, error, signIn, signUp, signInWithToken, signOut, refreshSession, updateUser, triggerPasswordReset, confirmPasswordReset]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

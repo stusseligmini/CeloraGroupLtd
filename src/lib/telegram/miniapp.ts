@@ -97,8 +97,6 @@ declare global {
         readTextFromClipboard: (callback?: (text: string) => void) => void;
         requestWriteAccess: (callback?: (granted: boolean) => void) => void;
         requestContact: (callback?: (granted: boolean, contact?: any) => void) => void;
-        ready: () => void;
-        expand: () => void;
       };
     };
   }

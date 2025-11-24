@@ -12,6 +12,15 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   telegramClient = new TelegramBotClient(process.env.TELEGRAM_BOT_TOKEN);
 }
 
+// TODO: Implement platform API client
+async function callPlatformApi<T>(
+  config: { path: string; method: string; userToken?: string },
+  fallbackFn: () => Promise<T>
+): Promise<T> {
+  // For now, always use fallback
+  return fallbackFn();
+}
+
 function getFallbackNotifications(): NotificationItem[] {
   const now = Date.now();
   return [
@@ -65,7 +74,7 @@ export async function fetchNotifications(
     {
       path,
       method: 'GET',
-      userToken,
+      userToken: userToken ?? undefined,
     },
     async () => ({
       notifications: getFallbackNotifications(),

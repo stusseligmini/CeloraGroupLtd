@@ -147,8 +147,10 @@ export async function broadcastSignedTransaction(
       txHash = txResponse.hash;
       
       const receipt = await txResponse.wait(1);
-      status = receipt.status === 1 ? 'confirmed' : 'failed';
-      blockNumber = receipt.blockNumber;
+      if (receipt) {
+        status = receipt.status === 1 ? 'confirmed' : 'failed';
+        blockNumber = receipt.blockNumber;
+      }
     }
     
     const result = {

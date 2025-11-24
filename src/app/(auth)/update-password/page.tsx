@@ -7,13 +7,21 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function UpdatePasswordPage() {
   const { triggerPasswordReset, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePasswordReset = async () => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
     setStatus(null);
     setError(null);
-    const result = await triggerPasswordReset();
+    
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+    
+    const result = await triggerPasswordReset(email);
 
     if (!result.success && result.error) {
       setError(result.error);
@@ -21,7 +29,7 @@ export default function UpdatePasswordPage() {
     }
 
     setStatus(
-      'A secure Azure AD B2C password reset flow has been started. Complete the steps in the new window to finish updating your password.',
+      'Password reset email sent. Check your inbox and follow the instructions.',
     );
   };
 
@@ -55,13 +63,30 @@ export default function UpdatePasswordPage() {
           </div>
         )}
 
-        <button
-          onClick={handlePasswordReset}
-          disabled={isLoading}
-          className="w-full bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:via-sky-400 hover:to-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-mono font-semibold py-3 rounded-md transition-all"
-        >
-          {isLoading ? 'Redirecting…' : 'Start Azure Password Reset'}
-        </button>
+        <form onSubmit={handlePasswordReset} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              Email address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full bg-gray-800/50 border border-cyan-400/30 rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+              placeholder="your@email.com"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:via-sky-400 hover:to-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-mono font-semibold py-3 rounded-md transition-all"
+          >
+            {isLoading ? 'Sending reset email…' : 'Send password reset'}
+          </button>
+        </form>
 
         <div className="text-sm text-gray-400 flex items-center justify-between">
           <Link href="/signin" className="text-cyan-300 hover:text-cyan-200 font-medium">

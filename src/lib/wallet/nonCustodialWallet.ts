@@ -72,7 +72,8 @@ export function validateMnemonicPhrase(mnemonic: string): boolean {
  */
 export function hashMnemonic(mnemonic: string): string {
   const normalized = mnemonic.trim().toLowerCase();
-  return sha256(new TextEncoder().encode(normalized)).toString('hex');
+  const hash = sha256(new TextEncoder().encode(normalized));
+  return Buffer.from(hash).toString('hex');
 }
 
 /**
@@ -113,9 +114,10 @@ export function deriveWallet(
         throw new Error('Failed to derive private key');
       }
       
-      const wallet = new ethers.Wallet(derivedKey.privateKey);
+      const privateKeyHex = '0x' + Buffer.from(derivedKey.privateKey).toString('hex');
+      const wallet = new ethers.Wallet(privateKeyHex);
       address = wallet.address;
-      publicKey = wallet.publicKey;
+      publicKey = wallet.signingKey.publicKey;
       privateKey = wallet.privateKey;
       break;
     }
@@ -128,19 +130,22 @@ export function deriveWallet(
         throw new Error('Failed to derive private key');
       }
 
-      const keyPair = ECPair.fromPrivateKey(derivedKey.privateKey!, {
+      const keyPair = ECPair.fromPrivateKey(Buffer.from(derivedKey.privateKey!), {
         network: bitcoin.networks.bitcoin,
       });
       
+      // Convert publicKey to Buffer (ECPair returns Uint8Array)
+      const publicKeyBuffer = Buffer.from(keyPair.publicKey);
+      
       // Generate native SegWit address (P2WPKH)
       const { address: btcAddress } = bitcoin.payments.p2wpkh({
-        pubkey: keyPair.publicKey,
+        pubkey: publicKeyBuffer,
         network: bitcoin.networks.bitcoin,
       });
 
       address = btcAddress!;
-      publicKey = keyPair.publicKey.toString('hex');
-      privateKey = derivedKey.privateKey!.toString('hex');
+      publicKey = publicKeyBuffer.toString('hex');
+      privateKey = Buffer.from(derivedKey.privateKey!).toString('hex');
       break;
     }
 
@@ -218,7 +223,7 @@ export class WalletEncryption {
     return crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt,
+        salt: new Uint8Array(salt),
         iterations,
         hash: 'SHA-256',
       },

@@ -131,7 +131,7 @@ export function parseGamblingTransaction(tx: HeliusTransaction, userAddress: str
   isCasinoTx: boolean;
 } {
   // Known casino addresses (update this list)
-  const CASINO_ADDRESSES = [
+  const CASINO_ADDRESSES: string[] = [
     // Add known casino deposit addresses here
     // 'Roobet...',
     // 'Stake...',

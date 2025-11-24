@@ -19,19 +19,17 @@ export async function checkIdempotency(
   idempotencyKey: string,
   userId: string
 ): Promise<IdempotencyResult> {
-  const existing = await prisma.idempotencyKey.findUnique({
+  const existing = await prisma.idempotencyKey.findFirst({
     where: {
-      key_userId: {
-        key: idempotencyKey,
-        userId,
-      },
+      key: idempotencyKey,
+      userId,
     },
   });
 
   if (existing) {
     return {
       isDuplicate: true,
-      previousResponse: existing.response as any,
+      previousResponse: existing.responseBody as any,
     };
   }
 
@@ -52,19 +50,19 @@ export async function storeIdempotency(
 
   await prisma.idempotencyKey.upsert({
     where: {
-      key_userId: {
-        key: idempotencyKey,
-        userId,
-      },
+      key: idempotencyKey,
     },
     create: {
       key: idempotencyKey,
       userId,
-      response: JSON.parse(JSON.stringify(response)),
+      endpoint: 'unknown',
+      method: 'POST',
+      statusCode: 200,
+      responseBody: JSON.parse(JSON.stringify(response)),
       expiresAt,
     },
     update: {
-      response: JSON.parse(JSON.stringify(response)),
+      responseBody: JSON.parse(JSON.stringify(response)),
       expiresAt,
     },
   });

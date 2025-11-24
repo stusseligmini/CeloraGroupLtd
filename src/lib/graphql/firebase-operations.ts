@@ -28,28 +28,52 @@ function getUserId(context: any): string | null {
 }
 
 /**
- * Create a key output type for Firebase mutations
+ * Cache for key output types to prevent duplicate type definitions
+ */
+const keyOutputCache = new Map<string, GraphQLObjectType>();
+
+/**
+ * Create a key output type for Firebase mutations (cached)
  */
 function createKeyOutput(entityName: string): GraphQLObjectType {
-  return new GraphQLObjectType({
+  const cached = keyOutputCache.get(entityName);
+  if (cached) {
+    return cached;
+  }
+  
+  const keyOutput = new GraphQLObjectType({
     name: `${entityName}_KeyOutput`,
     fields: {
       id: { type: new GraphQLNonNull(GraphQLID) },
     },
   });
+  
+  keyOutputCache.set(entityName, keyOutput);
+  return keyOutput;
 }
 
 /**
- * Create a generic key input type
+ * Cached key input type
+ */
+let cachedKeyInput: GraphQLInputObjectType | null = null;
+
+/**
+ * Create a generic key input type (cached)
  */
 function createKeyInput(): GraphQLInputObjectType {
-  return new GraphQLInputObjectType({
+  if (cachedKeyInput) {
+    return cachedKeyInput;
+  }
+  
+  cachedKeyInput = new GraphQLInputObjectType({
     name: 'KeyInput',
     fields: {
       id_expr: { type: GraphQLString },
       id: { type: GraphQLID },
     },
   });
+  
+  return cachedKeyInput;
 }
 
 /**

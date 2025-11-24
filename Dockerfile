@@ -3,10 +3,10 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
-RUN if [ -f package-lock.json ]; then npm ci; \
-    elif [ -f yarn.lock ]; then npm install --frozen-lockfile; \
+RUN if [ -f package-lock.json ]; then npm ci --legacy-peer-deps; \
+    elif [ -f yarn.lock ]; then npm install --frozen-lockfile --legacy-peer-deps; \
     elif [ -f pnpm-lock.yaml ]; then npm install -g pnpm && pnpm install --frozen-lockfile; \
-    else npm install; fi
+    else npm install --legacy-peer-deps; fi
 
 COPY . .
 RUN npm run build

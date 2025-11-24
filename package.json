@@ -133,7 +133,9 @@
     "elliptic": "^6.6.1",
     "bigint-buffer": "^1.1.5",
     "undici": "^6.22.0",
-    "tmp": "^0.2.4"
+    "tmp": "^0.2.4",
+    "react": "$react",
+    "react-dom": "$react-dom"
   },
   "engines": {
     "node": ">=20.0.0",

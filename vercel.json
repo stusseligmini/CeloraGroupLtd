@@ -1,16 +1,40 @@
 {
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "prisma generate && npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "env": {
+    "NODE_ENV": "production"
+  },
   "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
     {
       "source": "/api/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://celora.vercel.app"
+          "value": "*"
         },
         {
           "key": "Access-Control-Allow-Methods",
@@ -19,6 +43,10 @@
         {
           "key": "Access-Control-Allow-Headers",
           "value": "Content-Type, Authorization"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate"
         }
       ]
     }
@@ -28,5 +56,11 @@
       "source": "/graphql",
       "destination": "/api/graphql"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 }

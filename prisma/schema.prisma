@@ -1,5 +1,5 @@
 // Celora Database Schema
-// PostgreSQL with Firebase Cloud SQL
+// PostgreSQL with Neon (Serverless)
 
 generator client {
   provider        = "prisma-client-js"
@@ -8,9 +8,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // Direct connection for migrations (Cloud SQL Unix socket)
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Direct connection for migrations (Neon connection pooling)
   directUrl = env("DIRECT_DATABASE_URL")
 }
 

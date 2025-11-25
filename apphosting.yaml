@@ -1,70 +1,9 @@
-# Firebase App Hosting Configuration
-# https://firebase.google.com/docs/app-hosting
-
-runConfig:
-  # Node.js 20 runtime (recommended for Next.js 15)
-  runtime: nodejs20
-  
-  # CPU and memory allocation
-  cpu: 1
-  memoryMiB: 512
-  
-  # Auto-scaling configuration
-  minInstances: 0
-  maxInstances: 10
-  
-  # Cloud SQL connection (Unix socket for better performance)
-  cloudSqlInstances:
-    - celora-7b552:us-central1:celora-db
-  
-  # Environment variables
-  env:
-    # Application environment
-    - variable: NODE_ENV
-      value: production
-    
-    # Card provider configuration
-    - variable: CARD_PROVIDER
-      value: mock
-    
-    # Cashback token
-    - variable: CASHBACK_TOKEN
-      value: CELO
-    
-    # Database connections (Cloud SQL via Unix socket)
-    # Format: postgresql://USER:PASSWORD@/DATABASE?host=/cloudsql/INSTANCE_CONNECTION_NAME
-    - variable: DATABASE_URL
-      secret: database-url
-    
-    - variable: DIRECT_DATABASE_URL
-      secret: direct-database-url
-    
-    # Encryption keys (stored in Secret Manager)
-    - variable: MASTER_ENCRYPTION_KEY
-      secret: master-encryption-key
-    
-    - variable: WALLET_ENCRYPTION_KEY
-      secret: wallet-encryption-key
-    
-    - variable: SESSION_COOKIE_SECRET
-      secret: session-cookie-secret
-    
-    - variable: ENCRYPTION_KEY
-      secret: encryption-key
-    
-    - variable: ENCRYPTION_SALT
-      secret: encryption-salt
-    
-    # Firebase configuration (automatically injected by App Hosting)
-    # FIREBASE_CONFIG and FIREBASE_WEBAPP_CONFIG are set automatically
-
-# Build configuration
-build:
-  # Install dependencies with legacy peer deps flag
-  installCommand: npm ci --legacy-peer-deps
-  
-  # Build command: Generate Prisma client, run migrations, build Next.js
-  buildCommand: npx prisma generate && npx prisma migrate deploy && npm run build
-  
-  # Output directory for Next.js
-  outputDirectory: .next
+# DEPRECATED: Moved to Vercel for better Next.js performance
+# This file is kept for reference only
+# 
+# Current deployment platform: Vercel
+# Database: Neon PostgreSQL (Serverless)
+# Auth: Firebase Authentication
+# Storage: Vercel Blob
+# 
+# See vercel.json for active configuration

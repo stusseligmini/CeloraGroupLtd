@@ -95,9 +95,16 @@ model Wallet {
   address        String   
   publicKey      String?  @map("public_key")
   
-  // Non-custodial: Only store mnemonic hash for recovery verification
-  // Private keys are NEVER stored on server - they're encrypted client-side with user password
-  mnemonicHash        String?  @map("mnemonic_hash") // SHA-256 hash of mnemonic for recovery verification only
+  // ⚠️ NON-CUSTODIAL: We NEVER store private keys, seed phrases, or mnemonics
+  // Users manage their own keys in client (browser/mobile app)
+  // All keys are generated and stored LOCALLY using:
+  //   - Browser: IndexedDB with Web Crypto API encryption
+  //   - Mobile: Secure Enclave (iOS) / Keystore (Android)
+  //   - Extension: chrome.storage.local with encryption
+  // This wallet record is ONLY for:
+  //   - Linking public address to user account
+  //   - Caching balance/transaction history
+  //   - Username (@dexter.sol) to address mapping
   
   // Balance cache (stored in smallest unit: wei, satoshi, etc)
   balanceCache   String?  @map("balance_cache")

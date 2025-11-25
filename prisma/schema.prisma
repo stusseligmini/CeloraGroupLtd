@@ -1,5 +1,5 @@
 // Celora Database Schema
-// PostgreSQL with PgBouncer connection pooling
+// PostgreSQL with Firebase Cloud SQL
 
 generator client {
   provider        = "prisma-client-js"
@@ -10,7 +10,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // PgBouncer-compatible connection pool
+  // Direct connection for migrations (Cloud SQL Unix socket)
   directUrl = env("DIRECT_DATABASE_URL")
 }
 

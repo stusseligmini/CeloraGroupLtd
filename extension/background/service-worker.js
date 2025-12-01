@@ -24,7 +24,8 @@ function isValidOrigin(url) {
   try {
     const origin = new URL(url).origin;
     const allowedOrigins = [
-      'https://celora.vercel.app',
+      'https://celora-7b552.web.app',
+      'https://app.celora.com',
       chrome.runtime.getURL(''),
     ];
     return allowedOrigins.some((allowed) => origin.startsWith(allowed.replace(/\/$/, '')));

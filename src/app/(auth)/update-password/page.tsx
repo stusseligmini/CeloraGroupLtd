@@ -45,9 +45,7 @@ export default function UpdatePasswordPage() {
           <p className="uppercase tracking-[0.3em] text-xs text-cyan-300/80">Celora Identity</p>
           <h1 className="text-3xl font-mono font-bold text-cyan-200">Update Your Password</h1>
           <p className="text-sm text-gray-300 leading-relaxed">
-            Celora bruker Azure AD B2C for passordadministrasjon. Klikk på knappen under for å starte den
-            sikre B2C-reset flyten. Du blir sendt til Microsoft sitt passordskjema og returnerer hit når
-            prosessen er fullført.
+            Passordadministrasjon håndteres av Firebase Authentication. Skriv inn e‑posten din for å motta en sikker lenke for tilbakestilling av passord.
           </p>
         </div>
 

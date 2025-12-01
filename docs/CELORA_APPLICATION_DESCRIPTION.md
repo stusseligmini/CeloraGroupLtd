@@ -55,15 +55,16 @@ All chains use the same non-custodial architecture - unified user experience acr
 ## Technical Stack
 
 ### Frontend
-- **Framework:** Next.js 15 with React 19 and TypeScript
+- **Framework:** Next.js 16 with React 19 and TypeScript
 - **UI:** Tailwind CSS, custom components, mobile-first design
 - **PWA:** Progressive Web App with service workers
 - **Mobile:** Responsive design, optimized for mobile devices
 
 ### Backend
 - **API:** Next.js API routes (RESTful)
-- **Database:** PostgreSQL with Prisma ORM
-- **Authentication:** Azure AD B2C integration
+- **Database:** Firestore (Firebase)
+- **Authentication:** Firebase Authentication
+- **App Protection:** Firebase App Check + reCAPTCHA Enterprise
 - **Storage:** Client-side encryption (Web Crypto API)
 
 ### Blockchain Integration
@@ -81,7 +82,7 @@ All chains use the same non-custodial architecture - unified user experience acr
 ## Core Entities & Data Model
 
 ### User
-- Authentication via Azure AD B2C
+- Authentication via Firebase Authentication
 - Profile information (display name, username, phone)
 - Security settings (2FA, preferences)
 - Telegram integration (bot commands, notifications)
@@ -139,8 +140,7 @@ All chains use the same non-custodial architecture - unified user experience acr
 - Recovery via mnemonic phrase backup
 
 ### Server-Side Security
-- Azure AD B2C authentication
-- Session management with MSAL tokens
+- Firebase Authentication tokens (ID tokens)
 - Rate limiting on API endpoints
 - Idempotency keys for API requests
 - Audit logging for security events
@@ -203,7 +203,7 @@ All chains use the same non-custodial architecture - unified user experience acr
 - KYC handled by third-party fiat providers (MoonPay/Ramp)
 - Transaction monitoring for AML purposes
 - Audit logging for regulatory requirements
-- User identity verification via Azure AD B2C
+- User identity verification via Firebase Authentication
 
 ## Scalability & Performance
 

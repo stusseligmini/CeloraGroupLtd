@@ -13,9 +13,8 @@
     "clipboardWrite"
   ],
   "host_permissions": [
-    "https://celora.vercel.app/*",
-    "https://*.vercel.app/*",
-    "https://*.b2clogin.com/*",
+    "https://celora-7b552.web.app/*",
+    "https://app.celora.com/*",
     "https://rpc.gnosischain.com/*",
     "https://*.alchemy.com/*",
     "https://*.quicknode.pro/*",
@@ -45,8 +44,8 @@
     {
       "resources": ["assets/*", "popup/*"],
       "matches": [
-        "https://celora.vercel.app/*",
-        "https://*.vercel.app/*"
+        "https://celora-7b552.web.app/*",
+        "https://app.celora.com/*"
       ]
     }
   ]

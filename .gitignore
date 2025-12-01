@@ -17,6 +17,7 @@ playwright-report/
 test-results/
 cypress/screenshots/
 cypress/videos/
+extension/dist/
 
 # Environment variables
 .env*
@@ -72,8 +73,10 @@ tmp/
 # Package manager
 pnpm-lock.yaml
 yarn.lock
-package-lock.json
-.npmrc
+# Keep lockfile and npm config tracked for reproducible builds
+# (leave commented to avoid ignoring)
+# package-lock.json
+# .npmrc
 .yarnrc
 .pnp.*
 

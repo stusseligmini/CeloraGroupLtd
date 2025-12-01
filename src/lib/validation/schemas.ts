@@ -244,7 +244,11 @@ export const HealthCheckResponseSchema = z.object({
       latency: z.number().nullable(),
       error: z.string().optional(),
     }),
-    msal: z.object({
+    appCheck: z.object({
+      status: z.enum(['healthy', 'unhealthy']),
+      configured: z.boolean(),
+    }),
+    recaptcha: z.object({
       status: z.enum(['healthy', 'unhealthy']),
       configured: z.boolean(),
     }),
@@ -256,9 +260,9 @@ export const EnvDiagnosticsResponseSchema = z.object({
   nextVersion: z.string(),
   databaseConfigured: z.boolean(),
   redisConfigured: z.boolean(),
-  msalConfigured: z.boolean(),
-  azureKeyVaultConfigured: z.boolean(),
-  appInsightsConfigured: z.boolean(),
+  firebaseConfigured: z.boolean(),
+  appCheckConfigured: z.boolean(),
+  recaptchaConfigured: z.boolean(),
 });
 
 // ============================================================================

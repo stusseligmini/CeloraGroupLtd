@@ -133,19 +133,16 @@ export async function secureClipboardCopy(text: string, clearAfterMs: number = 3
  */
 export function isValidCeloraUrl(url: string): boolean {
   const allowedDomains = [
-    'celora.com',
-    'celora.azure',
-    'celora.azurewebsites.net',
+    'celora-7b552.web.app',
     'app.celora.com',
+    'celora.net',
+    'celora.com',
     'localhost',
   ];
   
   try {
     const urlObj = new URL(url);
-    return allowedDomains.some(domain => 
-      urlObj.hostname === domain || 
-      urlObj.hostname.endsWith('.' + domain)
-    );
+    return allowedDomains.some(domain => urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain));
   } catch {
     return false;
   }

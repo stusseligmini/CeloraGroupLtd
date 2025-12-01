@@ -124,8 +124,8 @@ export function csrfMiddleware(request: NextRequest): NextResponse | null {
   
   // Skip CSRF validation for certain paths
   const skipPaths = [
-    '/api/auth/b2c/session', // MSAL callback
-    '/api/diagnostics/health', // Health check
+    '/api/auth/session',
+    '/api/diagnostics/health',
   ];
   
   const pathname = request.nextUrl.pathname;

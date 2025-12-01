@@ -15,13 +15,13 @@ export async function GET() {
     nextVersion: process.env.npm_package_version || '1.0.0',
     databaseConfigured: Boolean(process.env.DATABASE_URL),
     redisConfigured: Boolean(process.env.REDIS_URL),
-    msalConfigured: Boolean(
-      process.env.NEXT_PUBLIC_AZURE_B2C_CLIENT_ID &&
-      process.env.NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN &&
-      process.env.AZURE_B2C_CLIENT_SECRET
+    firebaseConfigured: Boolean(
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_PROJECT_ID
     ),
-    azureKeyVaultConfigured: Boolean(process.env.AZURE_KEY_VAULT_URL),
-    appInsightsConfigured: Boolean(process.env.APPLICATION_INSIGHTS_CONNECTION_STRING),
+    appCheckConfigured: Boolean(process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY),
+    recaptchaConfigured: Boolean(process.env.RECAPTCHA_SECRET_KEY),
   });
 
   return successResponse(diagnostics, 200, requestId);

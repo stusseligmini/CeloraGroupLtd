@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
           <div className="space-y-2 text-center">
             <h1 className="text-2xl font-mono font-bold text-cyan-200">Reset password</h1>
             <p className="text-sm text-gray-300">
-              Vi bruker Azure AD B2C til å håndtere passordet ditt. Klikk på knappen under for å åpne Microsoft sitt sikre vindu for tilbakestilling.
+              Vi bruker Firebase Authentication for å håndtere passordet ditt. Skriv inn e‑posten din, så sender vi en sikker lenke for tilbakestilling.
             </p>
           </div>
 

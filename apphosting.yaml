@@ -1,9 +1,13 @@
-# DEPRECATED: Moved to Vercel for better Next.js performance
-# This file is kept for reference only
-# 
-# Current deployment platform: Vercel
-# Database: Neon PostgreSQL (Serverless)
-# Auth: Firebase Authentication
-# Storage: Vercel Blob
-# 
-# See vercel.json for active configuration
+# Firebase App Hosting configuration note
+#
+# This project deploys on Firebase App Hosting (Node builder) with Next.js.
+# The builder runs `npm ci` and `next build` using your package.json. If you
+# want to speed up installs and avoid dev-only tooling in CI, this repo ships
+# an `.npmrc` with `omit=dev`.
+#
+# Stack:
+# - Hosting: Firebase App Hosting
+# - Auth: Firebase Authentication + App Check (reCAPTCHA Enterprise)
+# - Database: Firestore
+# - Functions/Server: Next.js API Routes
+

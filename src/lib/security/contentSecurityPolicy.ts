@@ -28,8 +28,6 @@ export function generateCspNonce(): string {
 export function buildCspDirectives(config: CspConfig = {}): Record<string, string[]> {
   const { nonce } = config;
   
-  // Azure B2C domains
-  const azureB2CDomain = process.env.NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN || '*.b2clogin.com';
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   
   return {
@@ -40,9 +38,9 @@ export function buildCspDirectives(config: CspConfig = {}): Record<string, strin
       "'self'",
       nonce ? `'nonce-${nonce}'` : "'unsafe-inline'", // Fallback to unsafe-inline if no nonce
       "'strict-dynamic'", // Allow dynamically loaded scripts from trusted sources
-      // Azure Application Insights
-      'https://js.monitor.azure.com',
-      'https://az416426.vo.msecnd.net',
+      // Firebase/Google SDKs
+      'https://www.gstatic.com',
+      'https://www.googletagmanager.com',
     ].filter(Boolean),
     
     // Styles: Next.js requires unsafe-inline
@@ -58,8 +56,7 @@ export function buildCspDirectives(config: CspConfig = {}): Record<string, strin
       'data:',
       'blob:',
       'https:',
-      // Azure CDN
-      'https://*.azureedge.net',
+      'https://*.googleusercontent.com',
     ],
     
     // Fonts
@@ -73,17 +70,18 @@ export function buildCspDirectives(config: CspConfig = {}): Record<string, strin
     'connect-src': [
       "'self'",
       appUrl,
-      // Azure B2C
-      `https://${azureB2CDomain}`,
-      'https://login.microsoftonline.com',
-      // Application Insights
-      'https://dc.services.visualstudio.com',
-      'https://eastus-8.in.applicationinsights.azure.com',
-      // Blockchain RPC endpoints (add specific domains)
-      'https://*.infura.io',
-      'https://*.alchemy.com',
-      'wss://*.infura.io',
-      'wss://*.alchemy.com',
+      // Firebase / Google
+      'https://*.firebaseio.com',
+      'https://*.firebasedatabase.app',
+      'https://firestore.googleapis.com',
+      'https://securetoken.googleapis.com',
+      'https://www.googleapis.com',
+      'https://www.gstatic.com',
+      // Helius / Solana RPC
+      'https://*.helius-rpc.com',
+      'wss://*.helius-rpc.com',
+      'https://api.mainnet-beta.solana.com',
+      'wss://api.mainnet-beta.solana.com',
     ],
     
     // Object/embed: block
@@ -95,12 +93,8 @@ export function buildCspDirectives(config: CspConfig = {}): Record<string, strin
     // Form actions: same origin only
     'form-action': ["'self'"],
     
-    // Frames: allow Azure B2C
-    'frame-src': [
-      "'self'",
-      `https://${azureB2CDomain}`,
-      'https://login.microsoftonline.com',
-    ],
+    // Frames
+    'frame-src': ["'self'"],
     
     // Frame ancestors: prevent clickjacking
     'frame-ancestors': ["'none'"],

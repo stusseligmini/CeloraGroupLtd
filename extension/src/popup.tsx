@@ -8,10 +8,10 @@ import { CardManagement } from '@/components/CardManagement';
 
 function useAppUrl(): string {
   if (typeof window === 'undefined') {
-    return 'https://celora.vercel.app';
+    return 'https://app.celora.com';
   }
   const runtime = (window as typeof window & { __CELORA_APP_URL__?: string }).__CELORA_APP_URL__;
-  return runtime || 'https://celora.vercel.app';
+  return runtime || 'https://app.celora.com';
 }
 
 function ExtensionLoading() {

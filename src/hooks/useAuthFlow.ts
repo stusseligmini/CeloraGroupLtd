@@ -2,7 +2,7 @@
  * Authentication Flow Hooks
  * 
  * Provides convenient hooks for auth state, token management, and user info.
- * Powered by Azure AD B2C (MSAL).
+ * Backed by Firebase Authentication.
  */
 'use client';
 

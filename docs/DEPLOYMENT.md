@@ -1,8 +1,14 @@
-# Deployment Guide
+# Deployment Guide (Deprecated)
 
-## Quick Deploy
+This document described a Vercel/Neon deployment flow that is no longer used.
+Celora now deploys on Firebase App Hosting with Firestore/Firebase Auth.
 
-### Vercel (Recommended)
+See: `docs/FIREBASE_SETUP.md` and `firebase.json` for current deployment.
+
+---
+
+## Legacy Quick Deploy (Vercel)
+
 ```bash
 vercel --prod
 ```
@@ -27,7 +33,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_WEBHOOK_SECRET=...
 ```
 
-See `ENV_TEMPLATE.md` for complete list.
+Note: This section is legacy and for reference only.
 
 ## Deployment Checklist
 
@@ -43,12 +49,9 @@ See `ENV_TEMPLATE.md` for complete list.
 - [ ] Confirm Firebase auth connection
 - [ ] Check Telegram webhook (if enabled)
 
-## Vercel Configuration
+## Vercel Configuration (Legacy)
 
-Project uses `vercel.json` for routing and headers. Key settings:
-- API routes: `/api/**`
-- Rewrites for Telegram webhook
-- Security headers (CSP, HSTS)
+Project previously used `vercel.json`. Current hosting uses `firebase.json`.
 
 ## Database Migrations
 
@@ -57,15 +60,13 @@ Run Prisma migrations on deploy:
 npx prisma migrate deploy
 ```
 
-Vercel automatically runs this via `build` script.
+Note: Firebase App Hosting now runs the build and any migration steps.
 
-## Monitoring
+## Monitoring (Legacy)
 
-- Vercel Analytics: Built-in
-- Error tracking: Check Vercel logs
-- Database: Neon dashboard
+Refer to Firebase Console (App Hosting/Cloud Run logs) for current monitoring.
 
-## Rollback
+## Rollback (Legacy)
 
 ```bash
 # List deployments
@@ -77,5 +78,5 @@ vercel rollback [deployment-url]
 
 ## Production URLs
 
-- Web: `https://celora.vercel.app` (or custom domain)
+- Web: `https://app.celora.com` (primary) or `https://celora-7b552.web.app`
 - API: Same origin `/api/**`

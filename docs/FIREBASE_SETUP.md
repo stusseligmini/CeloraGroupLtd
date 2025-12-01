@@ -264,7 +264,7 @@ Expected response:
 ## 🔍 Troubleshooting
 
 ### Issue: Build fails with "npm ci" errors
-**Solution:** Package-lock.json is already synced (commit 67d70e9) ✅
+**Solution:** Regenerate `package-lock.json` locally using Node 24/npm 11, commit it, then push. Ensure `.npmrc` is checked in and consider `omit=dev=true` for App Hosting builds.
 
 ### Issue: "Environment variable not found: DATABASE_URL"
 **Solution:** Verify secrets are created in Secret Manager and service account has access
@@ -317,7 +317,7 @@ Before deploying, ensure:
 After successful deployment:
 
 1. **Run database migrations** (automatically done during build)
-2. **Test authentication** with Azure B2C
+2. **Test authentication** with Firebase Authentication
 3. **Test wallet creation** functionality
 4. **Monitor logs** in Firebase Console
 5. **Set up custom domain** (optional)

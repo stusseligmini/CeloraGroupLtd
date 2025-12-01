@@ -23,11 +23,9 @@ export async function GET() {
       latency: null,
     };
 
-    // Check MSAL configuration
-    const msalConfigured = Boolean(
-      process.env.NEXT_PUBLIC_AZURE_B2C_CLIENT_ID &&
-      process.env.NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN
-    );
+    // Check App Check / reCAPTCHA configuration
+    const appCheckConfigured = Boolean(process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY);
+    const recaptchaConfigured = Boolean(process.env.RECAPTCHA_SECRET_KEY);
 
     // Determine overall status
     const isHealthy = dbHealth.status === 'healthy' && redisHealth.status === 'healthy';
@@ -47,9 +45,13 @@ export async function GET() {
           status: redisHealth.status,
           latency: redisHealth.latency,
         },
-        msal: {
-          status: msalConfigured ? 'healthy' : 'unhealthy',
-          configured: msalConfigured,
+        appCheck: {
+          status: appCheckConfigured ? 'healthy' : 'unhealthy',
+          configured: appCheckConfigured,
+        },
+        recaptcha: {
+          status: recaptchaConfigured ? 'healthy' : 'unhealthy',
+          configured: recaptchaConfigured,
         },
       },
     });

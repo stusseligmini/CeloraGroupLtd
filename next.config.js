@@ -122,7 +122,7 @@ const nextConfig = {
     ];
   },
 
-  // Host-level redirects are handled by Azure Front Door; keep Next.js config minimal here
+  // Host-level redirects are handled by Firebase Hosting; keep Next.js config minimal here
 
   // Webpack configuration for better module resolution and performance
   webpack: (config, { isServer, dev }) => {

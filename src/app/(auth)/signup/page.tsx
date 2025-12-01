@@ -39,7 +39,7 @@ export default function SignUpPage() {
             <p className="uppercase tracking-[0.3em] text-xs text-purple-300/80">Celora Identity</p>
             <h1 className="text-3xl font-mono font-bold text-purple-200">Create your Celora ID</h1>
             <p className="text-sm text-gray-300 leading-relaxed">
-              Registreringen håndteres av Azure AD B2C. Du blir sendt til Microsoft sitt sikre grensesnitt for å fullføre prosessen.
+              Registreringen håndteres av Firebase Authentication. Du vil motta en e‑post for å bekrefte kontoen din.
             </p>
           </div>
 

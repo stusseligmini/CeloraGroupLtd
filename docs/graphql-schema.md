@@ -157,7 +157,6 @@ type Mutation {
 ```graphql
 type User {
   id: ID!
-  azureB2CId: String!
   email: String!
   emailVerified: Boolean!
   displayName: String

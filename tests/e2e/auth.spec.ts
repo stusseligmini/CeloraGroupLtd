@@ -25,7 +25,7 @@ test.describe('Authentication', () => {
 
   test('should display home page for authenticated users', async ({ page, context }) => {
     // Mock authentication by setting auth cookie
-    // Note: Mock cookies may not work with Azure B2C - this test may need real auth in production
+    // Note: Mock cookies may not work with real auth providers – use real integration in production
     await context.addCookies([{
       name: 'celora-auth-id-token',
       value: 'mock-token',

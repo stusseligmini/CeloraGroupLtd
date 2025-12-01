@@ -2,8 +2,8 @@
  * Rate Limiting with In-Memory Store
  * 
  * Implements sliding window rate limiting using in-memory store.
- * For production with multiple instances, consider using a reverse proxy
- * like Azure Front Door or Cloudflare for distributed rate limiting.
+ * For production with multiple instances, consider using an edge proxy
+ * like Cloudflare, Fastly, or a managed API gateway for distributed rate limiting.
  * 
  * @server-only This file must only be imported in server-side code (API routes, server components)
  */
@@ -108,7 +108,7 @@ export async function rateLimit(
   
   // Use in-memory rate limiting
   // NOTE: For production with multiple instances, implement distributed rate limiting
-  // at the infrastructure level (Azure Front Door, Cloudflare, etc.) or use
+  // at the infrastructure level (Cloudflare, Fastly, API Gateway) or use
   // an edge-compatible KV store like Upstash Redis with REST API
   return rateLimitInMemory(storeKey, limit, windowMs);
 }

@@ -453,7 +453,6 @@ const UserInsertInput = new GraphQLInputObjectType({
   name: 'UserInsertInput',
   fields: () => ({
     id: { type: GraphQLID },
-    azureB2CId: { type: GraphQLString },
     email: { type: GraphQLString },
     emailVerified: { type: GraphQLBoolean },
     displayName: { type: GraphQLString },

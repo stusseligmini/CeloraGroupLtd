@@ -62,13 +62,13 @@
     }
   ],
   "paths": {
-    "/auth/b2c/session": {
+    "/auth/session": {
       "post": {
         "tags": [
           "Auth"
         ],
         "summary": "Create session",
-        "description": "Creates a new session with MSAL tokens",
+        "description": "Creates a new session with Firebase ID token",
         "operationId": "createSession",
         "requestBody": {
           "required": true,
@@ -612,7 +612,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "MSAL access token from Azure B2C"
+        "description": "Firebase ID access token"
       }
     },
     "schemas": {
@@ -1874,7 +1874,7 @@
                   "latency"
                 ]
               },
-              "msal": {
+              "auth": {
                 "type": "object",
                 "properties": {
                   "status": {
@@ -1884,20 +1884,23 @@
                       "unhealthy"
                     ]
                   },
-                  "configured": {
-                    "type": "boolean"
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "firebase"
+                    ]
                   }
                 },
                 "required": [
                   "status",
-                  "configured"
+                  "provider"
                 ]
               }
             },
             "required": [
               "database",
               "redis",
-              "msal"
+              "auth"
             ]
           }
         },
@@ -1923,13 +1926,13 @@
           "redisConfigured": {
             "type": "boolean"
           },
-          "msalConfigured": {
+          "firebaseAuthConfigured": {
             "type": "boolean"
           },
-          "azureKeyVaultConfigured": {
+          "secretsManagerConfigured": {
             "type": "boolean"
           },
-          "appInsightsConfigured": {
+          "telemetryConfigured": {
             "type": "boolean"
           }
         },
@@ -1937,10 +1940,10 @@
           "nodeEnv",
           "nextVersion",
           "databaseConfigured",
-          "redisConfigured",
-          "msalConfigured",
-          "azureKeyVaultConfigured",
-          "appInsightsConfigured"
+              "redisConfigured",
+              "firebaseAuthConfigured",
+              "secretsManagerConfigured",
+              "telemetryConfigured"
         ]
       },
       "Error": {

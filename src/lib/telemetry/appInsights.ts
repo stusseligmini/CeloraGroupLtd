@@ -1,6 +1,6 @@
 /**
- * Vercel Analytics Telemetry Module
- * Simplified telemetry without Azure Application Insights
+ * Telemetry Module
+ * Lightweight console-based telemetry; integrate with your chosen analytics or tracing platform as needed.
  */
 
 export interface TelemetryEvent {

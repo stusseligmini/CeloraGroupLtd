@@ -55,12 +55,13 @@ describe('Content Security Policy', () => {
       expect(directives['script-src']).toContain(`'nonce-${nonce}'`);
     });
     
-    it('should include Azure domains in connect-src', () => {
+    it('should include Firebase/Google domains in connect-src', () => {
       const directives = buildCspDirectives({});
       
       const connectSrc = directives['connect-src'];
       expect(connectSrc).toBeDefined();
-      expect(connectSrc.some((src: string) => src.includes('b2clogin.com'))).toBe(true);
+      expect(connectSrc.some((src: string) => src.includes('firestore.googleapis.com'))).toBe(true);
+      expect(connectSrc.some((src: string) => src.includes('securetoken.googleapis.com'))).toBe(true);
     });
     
     it('should have self in default-src', () => {
@@ -69,14 +70,15 @@ describe('Content Security Policy', () => {
       expect(directives['default-src']).toContain("'self'");
     });
     
-    it('should include Application Insights domains', () => {
+    it('should include Firebase/Google SDK domains', () => {
       const directives = buildCspDirectives({});
       
       const scriptSrc = directives['script-src'];
       const connectSrc = directives['connect-src'];
       
-      expect(scriptSrc.some((src: string) => src.includes('monitor.azure.com'))).toBe(true);
-      expect(connectSrc.some((src: string) => src.includes('applicationinsights.azure.com'))).toBe(true);
+      expect(scriptSrc.some((src: string) => src.includes('www.gstatic.com'))).toBe(true);
+      expect(scriptSrc.some((src: string) => src.includes('googletagmanager'))).toBe(true);
+      expect(connectSrc.some((src: string) => src.includes('www.googleapis.com'))).toBe(true);
     });
   });
 });
@@ -150,15 +152,15 @@ describe('CSP Directive Building', () => {
   });
   
   it('should handle missing environment variables gracefully', () => {
-    const originalAuth = process.env.NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN;
-    delete process.env.NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN;
+    const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
     
     const directives = buildCspDirectives({});
     
     expect(directives).toHaveProperty('connect-src');
     
-    if (originalAuth) {
-      process.env.NEXT_PUBLIC_AZURE_B2C_AUTHORITY_DOMAIN = originalAuth;
+    if (originalAppUrl) {
+      process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
     }
   });
   

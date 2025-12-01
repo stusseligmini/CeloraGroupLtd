@@ -1,23 +1,57 @@
-# Application Insights Telemetry
+# Telemetry & Metrics (Lean Non-Custodial)
 
-Comprehensive telemetry solution for Celora PWA with client and server-side tracking.
+Goal: Minimal insight without compromising user privacy or key security.
 
-## Installation
+## Principles
+- No session replay.
+- No seed phrase or key-related events.
+- Aggregate-only usage metrics.
+- Opt-out toggle available.
 
-```bash
-npm install
+## Recommended Tools
+| Purpose | Option |
+|---------|--------|
+| Web Vitals | Built-in Next.js / Vercel Analytics |
+| Errors | Sentry (strip PII) |
+| Performance Profiling | Lighthouse CI (optional) |
+| Custom Events | Lightweight fetch to `/api/metrics` batching counts |
+
+## Example Client Event Wrapper
+```ts
+export function track(event: string, data?: Record<string, unknown>) {
+  if (!window.navigator.onLine) return;
+  queue.push({ event, t: Date.now(), data });
+}
+const queue: any[] = [];
+setInterval(async () => {
+  if (queue.length === 0) return;
+  const batch = queue.splice(0, queue.length);
+  try {
+    await fetch('/api/metrics', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(batch) });
+  } catch { /* silent */ }
+}, 5000);
 ```
 
-The following packages are required (already in package.json):
-- `@microsoft/applicationinsights-web` - Client-side tracking
-- `@microsoft/applicationinsights-react-js` - React integration  
-- `applicationinsights` - Server-side tracking
+## Metrics To Capture
+- Successful wallet creations (count)
+- Transactions signed (count only)
+- Swap operations triggered
+- Fiat on-ramp widget opens
 
-## Configuration
+## Avoid Collecting
+- Full public addresses (hash or omit)
+- Precise amounts tied to user identity
+- Any decrypted key material
 
-### Environment Variables
+## Privacy Statement Snippet
+"Celora records anonymous usage counts (e.g., number of transactions) to improve performance. No private keys or seed phrases are ever transmitted or stored."
 
-Add to `.env.local`:
+## Opt-Out
+Provide a settings toggle: `Disable anonymous telemetry` → sets local flag preventing `track()` calls.
+
+## Status
+Telemetry layer minimized and vendor-neutral.
+
 
 ```env
 # Client-side (publicly accessible)
@@ -34,13 +68,6 @@ APPINSIGHTS_SAMPLING_PERCENTAGE=100
 APPINSIGHTS_AUTO_COLLECT=true
 APP_VERSION=1.0.0
 ```
-
-### Azure Portal Setup
-
-1. Create Application Insights resource in Azure Portal
-2. Copy **Connection String** from Overview page
-3. Copy **Instrumentation Key** from Overview page
-4. Add to environment variables
 
 ## Usage
 
@@ -107,10 +134,10 @@ try {
 import { trackAuthSuccess, trackAuthFailure } from '@/lib/telemetry';
 
 // On successful login
-trackAuthSuccess(user.id, 'azure-b2c');
+trackAuthSuccess(user.id, 'firebase');
 
 // On failed login
-trackAuthFailure('invalid_credentials', 'azure-b2c');
+trackAuthFailure('invalid_credentials', 'firebase');
 ```
 
 #### Track API Calls
@@ -286,48 +313,6 @@ trackServerException({
 - `performance.slow.api` - API call took >2s
 - `performance.slow.render` - Render took >1s
 
-## Azure Portal Dashboards
-
-### Recommended KQL Queries
-
-#### Auth Failures (Last 24h)
-```kql
-customEvents
-| where timestamp > ago(24h)
-| where name == "auth.login.failure"
-| summarize count() by tostring(customDimensions.error), bin(timestamp, 1h)
-| render timechart
-```
-
-#### API P95 Latency
-```kql
-customEvents
-| where timestamp > ago(24h)
-| where name == "api.request.success" or name == "api.request.failure"
-| extend duration = todouble(customMeasurements.duration)
-| summarize percentile(duration, 95) by tostring(customDimensions.endpoint), bin(timestamp, 5m)
-| render timechart
-```
-
-#### Error Rate by Type
-```kql
-exceptions
-| where timestamp > ago(24h)
-| summarize count() by type, bin(timestamp, 1h)
-| render barchart
-```
-
-#### Slow API Calls
-```kql
-customEvents
-| where timestamp > ago(24h)
-| where name == "performance.slow.api"
-| extend duration = todouble(customMeasurements.duration)
-| extend endpoint = tostring(customDimensions.endpoint)
-| project timestamp, endpoint, duration
-| order by duration desc
-```
-
 ## Alerts Configuration
 
 ### Recommended Alerts
@@ -368,13 +353,12 @@ APPINSIGHTS_SAMPLING_PERCENTAGE=100
 
 ### Data Retention
 
-Default retention in Azure Application Insights: **90 days**
+Default retention: **30-90 days** (platform-dependent)
 
 To extend:
-1. Go to Application Insights resource
-2. Navigate to **Usage and estimated costs**
-3. Click **Data Retention**
-4. Select retention period (up to 730 days)
+1. Check your hosting/telemetry platform documentation
+2. Configure retention period in platform settings
+3. Consider exporting to long-term storage for compliance
 
 ## Best Practices
 
@@ -435,7 +419,6 @@ componentDidCatch(error: Error, errorInfo: ErrorInfo) {
 1. ✅ Install dependencies: `npm install`
 2. ✅ Configure environment variables
 3. ✅ Test in development
-4. ✅ Create Azure dashboards (see KQL queries above)
-5. ✅ Set up alerts (see recommendations above)
+4. ✅ Set up alerts (see recommendations above)
 6. ✅ Adjust sampling for production
 7. ✅ Monitor costs and performance

@@ -1,18 +1,56 @@
-# Monitoring & Alerting Setup Guide
+# Monitoring & Observability (Non-Custodial)
 
-This guide covers the setup and configuration of Azure Monitor alerts and dashboards for Celora.
+All legacy cloud-specific monitoring instructions removed. This product now relies on:
 
-## Overview
+- Client-side performance metrics (Web Vitals)
+- Error tracking (optional: Sentry or OpenTelemetry exporter)
+- Transaction status polling via RPC provider (Helius / QuickNode)
+- Lightweight server logs (username resolution, public metadata)
 
-Celora uses Azure Application Insights for application monitoring and Azure Monitor for alerting. The monitoring infrastructure is defined in:
+## What To Implement
 
-- **Terraform**: `infra/terraform/modules/global-monitoring/`
-- **Bicep**: `infra/bicep/modules/monitoring.bicep`
+1. Browser metrics: integrate a small hook to record page load, interaction delays.
+2. RPC health: periodic ping of Solana RPC endpoint; fallback to secondary.
+3. Error tracking: capture unexpected exceptions (never keys or seeds).
+4. Security events: failed transaction signatures, malformed requests.
 
-## Prerequisites
+## Not Included
 
-1. Azure Application Insights resource created
-2. Azure Monitor Action Group configured with notification channels
+- Centralized application performance suite tied to proprietary platforms.
+- Vendor-specific alerting scripts.
+
+## Suggested Stack
+
+| Layer | Tool |
+|-------|------|
+| Frontend metrics | Vercel Analytics |
+| Errors | Sentry SDK (optional) |
+| RPC uptime | Custom heartbeat cron |
+| Alerts | Slack webhook + minimal Node script |
+
+## Example Heartbeat Script (server-only)
+```ts
+import fetch from 'node-fetch';
+
+async function heartbeat() {
+  const start = Date.now();
+  try {
+    const res = await fetch(process.env.SOLANA_RPC!, { method: 'POST', body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'getHealth' }) });
+    const ok = res.ok;
+    const ms = Date.now() - start;
+    if (!ok) throw new Error('rpc unhealthy');
+    console.log('rpc ok', ms+'ms');
+  } catch (e) {
+    // send simple alert
+    await fetch(process.env.ALERT_WEBHOOK!, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text:`RPC heartbeat failed: ${e}` }) });
+  }
+}
+heartbeat();
+```
+
+## Status
+This document intentionally excludes legacy vendor references. Monitoring is minimal, privacy-respecting, and key-safe.
+
 3. Terraform or Bicep deployment completed
 
 ## Alert Rules
@@ -76,33 +114,40 @@ The following alert rules are configured:
    terraform apply
    ```
 
-### Using Azure Portal
+### Alert Configuration (Generic)
 
-1. Navigate to **Azure Monitor** > **Alerts**
-2. Click **Create** > **Alert rule**
-3. Select your Application Insights resource
-4. Configure metric, threshold, and action group
-5. Save the alert rule
+Use infrastructure-as-code where possible:
+1. Define alert specs in a versioned config file (YAML/JSON).
+2. Deploy via script (e.g., custom Node CLI or Terraform provider for chosen platform).
+3. Metrics to watch: RPC latency, failed transaction broadcast count, error rate.
+4. Send notifications via webhook (Slack/Discord) + optional email.
 
-## Action Groups
+## Notification Targets
 
-Action Groups define who gets notified when alerts fire. Configure in:
+Configure recipients in a simple JSON manifest:
+```json
+{
+  "alerts": {
+    "critical": ["ops@celora.local"],
+    "warning": ["dev@celora.local"],
+    "info": ["logs@celora.local"]
+  }
+}
+```
 
-- **Terraform**: `infra/terraform/modules/global-monitoring/main.tf` (action_group resource)
-- **Azure Portal**: Azure Monitor > Action groups
+Legacy platform-specific action group references removed.
 
 ### Adding Notification Channels
 
 1. Email: Add email addresses to receive alerts
 2. SMS: Add phone numbers for critical alerts
 3. Webhook: Configure webhooks for integration with PagerDuty, Slack, etc.
-4. Azure Function: Trigger serverless functions for automated responses
 
 ## Dashboards
 
 ### Creating Custom Dashboards
 
-1. Navigate to **Azure Portal** > **Application Insights** > **Dashboards**
+(Legacy dashboard instructions removed – use generic metrics dashboard tooling or custom panel)
 2. Click **New Dashboard**
 3. Add tiles for:
    - **Request Rate**: `requests/count`
@@ -182,10 +227,7 @@ exceptions
 
 ### Manual Alert Testing
 
-1. Navigate to **Azure Monitor** > **Alerts**
-2. Select an alert rule
-3. Click **Test** or **Run query**
-4. Verify alert fires when threshold is exceeded
+Use your monitoring platform's testing tools to validate alert rules trigger correctly when thresholds are exceeded.
 
 ### Simulating Issues
 
@@ -202,7 +244,7 @@ For testing purposes, you can temporarily:
 ### When an Alert Fires
 
 1. **Acknowledge**: Confirm receipt of alert
-2. **Investigate**: Check Application Insights logs and metrics
+2. **Investigate**: Check monitoring platform logs and metrics
 3. **Assess Impact**: Determine user impact and severity
 4. **Resolve**: Fix the issue or implement workaround
 5. **Document**: Record incident details and resolution
@@ -253,14 +295,14 @@ APPLICATION_INSIGHTS_SAMPLING_PERCENTAGE=10
 
 ### Missing Metrics
 
-1. Verify Application Insights SDK is properly configured
-2. Check telemetry is being sent (review Live Metrics)
+1. Verify telemetry SDK is properly configured
+2. Check telemetry is being sent (review live metrics dashboard)
 3. Verify sampling isn't filtering out all data
-4. Check firewall rules allow Application Insights endpoints
+4. Check firewall rules allow telemetry endpoints
 
 ## Resources
 
-- [Azure Monitor Documentation](https://docs.microsoft.com/azure/azure-monitor/)
-- [Application Insights Kusto Queries](https://docs.microsoft.com/azure/azure-monitor/logs/kusto/query/)
-- [Alert Rule Best Practices](https://docs.microsoft.com/azure/azure-monitor/alerts/alerts-overview)
+- OpenTelemetry documentation for vendor-neutral instrumentation
+- Prometheus alerting best practices
+- Generic monitoring platform documentation (Datadog, Grafana, New Relic)
 

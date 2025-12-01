@@ -3,7 +3,7 @@
  * 
  * Simple cache using Map for development and single-instance deployments.
  * For production with multiple instances, implement distributed caching
- * at the infrastructure level (Azure Redis Cache via REST API, Upstash, etc.)
+ * using a managed Redis provider (Upstash, Redis Enterprise, cloud provider Redis, etc.)
  */
 
 import { logger } from '@/lib/logger';

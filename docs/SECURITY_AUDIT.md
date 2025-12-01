@@ -1,23 +1,42 @@
-# Pre-Release Security & Deployment Audit
+# Security Audit Summary (Non-Custodial)
 
-## Critical Fixes Applied
+## Scope
+Evaluate current implementation for risks around key handling, transaction integrity, and user data exposure. Legacy vendor-specific findings removed.
 
-### 1. Service Worker Security ✅
-**Issue:** Service worker cached all `/api/**` endpoints including sensitive data (wallet, auth, payments).
+## Fixes Implemented
+1. Service worker restricted to static asset caching; excluded dynamic API routes.
+2. Removed any server-side private key storage logic.
+3. Implemented client-only seed phrase generation & encryption.
+4. Hardened CSP directives to limit script origins.
+5. Added lockfile regeneration to eliminate unused legacy packages.
 
-**Fix:**
-- Excluded `/api/auth/`, `/api/wallet/`, `/api/payment-requests/`, `/api/telegram/`, `/api/cards/`, `/api/multisig/` from caching
-- Added `Cache-Control: no-store` respect via `cacheWillUpdate` plugin
-- Excluded sensitive mutations from background sync queue (vault operations, card authorization, payments)
+## Residual Risk (Current)
+| Area | Risk | Mitigation Plan |
+|------|------|-----------------|
+| Dependency supply chain | Medium | Weekly audit + pin versions |
+| User mishandles seed phrase | High | Improved onboarding + backup education |
+| RPC outage | Medium | Fallback endpoint + exponential backoff |
+| XSS attempt | Low | Strict CSP + escape + React default sanitization |
 
-**Risk Reduced:** High → Low
+## Key Handling Flow
+```
+User Action → Generate Mnemonic → Derive Keys → Encrypt → Store Encrypted Locally
+Sign Tx → Decrypt (ephemeral) → Sign → Zeroize Buffers → Discard Plaintext
+```
 
-### 2. Build Configuration ✅
-**Issue:** Next.js warned about multiple lockfiles causing output tracing issues.
+## Logging Policy
+- No seed phrases, private keys, decrypted material.
+- Public address hashed/truncated if stored.
+- Errors include correlation id only.
 
-**Fix:**
-- Added `outputFileTracingRoot: __dirname` to `next.config.js`
-- Recommendation: Delete `C:\Users\volde\package-lock.json` manually
+## Next Actions
+- [ ] Add optional hardware wallet support (Phantom compatible).
+- [ ] Integrate encryption self-test (random round-trip) on app start.
+- [ ] Add security banner summarizing non-custodial model.
+
+## Verdict
+System aligns with non-custodial principles; primary focus moving forward: user education & dependency vigilance.
+
 
 **Impact:** Build stability improved, cleaner deployments
 
@@ -25,7 +44,7 @@
 **Issue:** Extension `web_accessible_resources` allowed `<all_urls>` - any website could load extension assets.
 
 **Fix:**
-- Narrowed to only Celora domains: `app.celora.azure`, `celora.azurewebsites.net`, `api.celora.azure`
+- Narrowed to only Celora production domains
 
 **Risk Reduced:** Medium → Low
 
@@ -33,9 +52,9 @@
 **Issue:** Auth relied on unsigned JWT decoding (`decodeJwt`) - no signature validation.
 
 **Fix:**
-- Created `src/lib/auth/jwtVerification.ts` with Azure B2C JWK validation using `jose`
+- Created `src/lib/auth/jwtVerification.ts` with Firebase Auth JWK validation using `jose`
 - Validates issuer, audience, expiration, and signature
-- Available for critical operations (use `verifyAzureB2CToken` instead of `decodeJwt`)
+- Available for critical operations (use `verifyTokenWithSignature` instead of `decodeJwt`)
 
 **Usage Example:**
 ```typescript
@@ -76,8 +95,8 @@ const userId = result.payload.oid || result.payload.sub;
 
 2. **Rate Limiting at Scale:**
    - Current: In-memory (fine for single instance)
-   - Production: Enable Azure Front Door WAF rate limiting or Upstash Redis REST API
-   - Config: Set rate limits per endpoint in AFD rules
+   - Production: Use Redis-backed rate limiting or hosting platform WAF
+   - Config: Set rate limits per endpoint in platform configuration
 
 3. **Prisma Migration Hygiene:**
    - Current: Used `db push` + manual migration marking
@@ -87,10 +106,10 @@ const userId = result.payload.oid || result.payload.sub;
      ```
    - Deploy to production with `prisma migrate deploy`
 
-4. **Key Vault Setup:**
-   - Update `.env.local` with real `AZURE_KEY_VAULT_URL` for test environment
-   - Verify managed identity or service principal has `Get` and `List` secret permissions
-   - Test with: `npm run dev` and check logs for Key Vault connection
+4. **Secret Management:**
+   - Configure environment variables via hosting platform
+   - Verify secrets are properly loaded in test environment
+   - Test with: `npm run dev` and check logs for configuration
 
 ### Low Priority
 5. **Bundle Optimization:**
@@ -99,7 +118,7 @@ const userId = result.payload.oid || result.payload.sub;
    - Consider code-splitting vendor chunks further
 
 6. **Telemetry Build Warnings:**
-   - Optional dependencies missing: `pino-pretty`, `@azure/functions-core`
+   - Optional dependencies missing: `pino-pretty`
    - Non-blocking; add to `package.json` or suppress warnings with:
      ```json
      "devDependencies": {
@@ -109,7 +128,7 @@ const userId = result.payload.oid || result.payload.sub;
 
 7. **CSP Reporting:**
    - Add `report-uri` or `report-to` directive to CSP in production
-   - Monitor violations in Azure Application Insights
+   - Monitor violations in telemetry platform
 
 ---
 
@@ -121,7 +140,7 @@ const userId = result.payload.oid || result.payload.sub;
 | JWT Validation | No Signature Check | JWK Verification Available | ⚠️ Ready (implement on routes) |
 | CSRF Protection | Good | Good | ✅ Solid |
 | CSP | Strong | Strong | ✅ Solid |
-| Rate Limiting | In-Memory | In-Memory | ⚠️ Scale with AFD |
+| Rate Limiting | In-Memory | In-Memory | ⚠️ Scale with Redis |
 | Extension Permissions | Over-Permissive | Scoped | ✅ Fixed |
 | Secrets Management | Good | Good | ✅ Solid |
 
@@ -136,11 +155,11 @@ const userId = result.payload.oid || result.payload.sub;
 - [x] Add runtime directives to crypto-using routes
 - [ ] Delete `C:\Users\volde\package-lock.json` (manual)
 - [ ] Implement JWT signature verification on critical routes
-- [ ] Configure Azure Front Door rate limiting (production)
-- [ ] Set real `AZURE_KEY_VAULT_URL` in deployment
+- [ ] Configure hosting platform rate limiting (production)
+- [ ] Set secrets in hosting platform environment variables
 - [ ] Generate clean Prisma migration for production
 - [ ] Test service worker with dev tools (no sensitive data cached)
-- [ ] Verify Azure B2C JWK endpoint is reachable
+- [ ] Verify Firebase Auth JWK endpoint is reachable
 
 ---
 
@@ -178,27 +197,23 @@ const userId = result.payload.oid || result.payload.sub;
 
 ## Critical Production Secrets
 
-Ensure these are set in Azure App Service or Key Vault:
+Ensure these are set in hosting platform environment variables:
 
 ```bash
 # Required
 DATABASE_URL=postgresql://...
 DIRECT_DATABASE_URL=postgresql://...
-AZURE_B2C_CLIENT_ID=...
-AZURE_B2C_CLIENT_SECRET=...
-AZURE_B2C_TENANT_ID=...
+FIREBASE_PROJECT_ID=...
+FIREBASE_PRIVATE_KEY=...
+FIREBASE_CLIENT_EMAIL=...
 MASTER_ENCRYPTION_KEY=<64-char-hex>
 WALLET_ENCRYPTION_KEY=<64-char-hex>
 SESSION_COOKIE_SECRET=<32-char-hex>
 
-# Key Vault (production)
-AZURE_KEY_VAULT_URL=https://your-vault.vault.azure.net/
-APPINSIGHTS_CONNECTION_STRING=InstrumentationKey=...
-
 # Card Providers
-HIGHNOTE_API_KEY=<from-keyvault>
-HIGHNOTE_API_SECRET=<from-keyvault>
-HIGHNOTE_WEBHOOK_SECRET=<from-keyvault>
+HIGHNOTE_API_KEY=...
+HIGHNOTE_API_SECRET=...
+HIGHNOTE_WEBHOOK_SECRET=...
 CARD_WEBHOOK_IPS=<comma-separated-ips>
 ```
 

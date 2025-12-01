@@ -74,8 +74,8 @@ Creates:
 
 ### Core Models
 
-1. **User** - Azure AD B2C synced accounts
-2. **Session** - MSAL token storage
+1. **User** - Firebase Auth user accounts
+2. **Session** - Firebase session / token metadata
 3. **Wallet** - Multi-chain wallet support
 4. **Transaction** - Blockchain transaction history
 5. **Notification** - Push/email/in-app notifications
@@ -97,7 +97,7 @@ Wallet (1) ──> (N) Transaction
 
 - **Connection pooling**: Reduces PostgreSQL connection overhead
 - **Scalability**: Supports 1000s of client connections
-- **Azure-ready**: Works with Azure Database for PostgreSQL
+- **Works with managed PostgreSQL offerings**: Neon, RDS, Cloud SQL, etc.
 
 ### Configuration (`pgbouncer.ini`)
 
@@ -139,7 +139,6 @@ import { prisma } from '@/server/db/client';
 // Create user
 const user = await prisma.user.create({
   data: {
-    azureB2CId: '...',
     email: 'user@example.com',
     displayName: 'John Doe',
   },
@@ -236,13 +235,13 @@ const health = await checkDatabaseHealth();
 
 1. **Never commit `.env`** - use `.env.example` as template
 2. **Use SSL in production**: `?sslmode=require`
-3. **Rotate credentials** regularly via Azure Key Vault
-4. **Encrypt sensitive data**: Use `encryptedPrivateKey` fields
+3. **Rotate credentials** regularly via a secret manager (e.g., AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault)
+4. **Encrypt sensitive data**: Use dedicated encrypted fields
 5. **Audit logs**: Track all DB changes via triggers or CDC
 
 ## Next Steps
 
-- [ ] Set up automated backups (Azure Backup or pg_dump cron)
-- [ ] Configure read replicas for scaling
+- [ ] Set up automated backups (pg_dump / managed provider automated backups)
+- [ ] Configure read replicas for scaling (if provider supports)
 - [ ] Implement CDC for real-time event streaming
-- [ ] Add monitoring dashboards (Azure Monitor + Prisma metrics)
+- [ ] Add monitoring dashboards (e.g., Grafana + Prometheus / provider metrics)

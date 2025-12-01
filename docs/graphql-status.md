@@ -130,7 +130,7 @@ query {
 
 ## ⚠️ Kjente problemer / TODO
 
-1. **AuthProvider må oppdateres** - Client-side authentication må endres fra Azure MSAL til Firebase Auth
+1. **AuthProvider** - Client-side authentication migrated to Firebase Auth (legacy provider removed)
 2. **API routes** - Noen API routes bruker fortsatt sync `getUserIdFromRequest`, må oppdateres til async
 3. **Mutations** - `sendTransaction` mutation er ikke implementert (bruk REST API i mellomtiden)
 4. **Error handling** - Kan forbedres med bedre feilmeldinger

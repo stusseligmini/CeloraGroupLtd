@@ -18,6 +18,7 @@ test-results/
 cypress/screenshots/
 cypress/videos/
 extension/dist/
+dist/
 
 # Environment variables
 .env*

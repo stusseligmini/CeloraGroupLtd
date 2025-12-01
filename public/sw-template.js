@@ -140,35 +140,7 @@ if (workbox) {
     })
   );
   
-  // Cache Azure B2C assets with NetworkFirst
-  workbox.routing.registerRoute(
-    ({ url }) => url.hostname.includes('b2clogin.com'),
-    new workbox.strategies.NetworkFirst({
-      cacheName: 'azure-b2c-cache',
-      plugins: [
-        new workbox.expiration.ExpirationPlugin({
-          maxEntries: 10,
-          maxAgeSeconds: 24 * 60 * 60, // 24 hours
-        }),
-      ],
-    })
-  );
-  
-  // Cache Application Insights with NetworkFirst
-  workbox.routing.registerRoute(
-    ({ url }) => 
-      url.hostname.includes('applicationinsights.azure.com') ||
-      url.hostname.includes('monitor.azure.com'),
-    new workbox.strategies.NetworkFirst({
-      cacheName: 'app-insights-cache',
-      plugins: [
-        new workbox.expiration.ExpirationPlugin({
-          maxEntries: 20,
-          maxAgeSeconds: 60 * 60, // 1 hour
-        }),
-      ],
-    })
-  );
+  // Removed legacy Azure-specific caching (B2C, Application Insights)
   
   // =====================================================================
   // Offline Fallback

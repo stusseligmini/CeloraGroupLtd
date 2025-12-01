@@ -1,24 +1,45 @@
-# Virtual Cards Implementation - Final Summary
+# Virtual Cards Feature Summary (Non-Custodial)
 
-## ✅ **Implementation Complete: 11 av 12 oppgaver (92%)**
+## Status
+Implementation progressing with a strict non-custodial stance. All legacy provider-specific and vendor references removed.
 
-### **Kritiske sikkerhetsforbedringer (P0) - FULLFØRT**
+## Completed
+1. Removed storage of sensitive card verification data (no CVV persistence).
+2. Unified authentication: all card-related endpoints require valid user session token.
+3. Webhook security: HMAC verification + optional IP allowlist.
+4. Data model limited to non-sensitive card metadata (brand, last4, status).
 
-1. ✅ **CVV Persistence Removed (PCI DSS Compliant)**
-   - `encryptedCVV` field droppet fra `schema.prisma`
-   - CVV returneres kun én gang ved opprettelse
-   - Kan aldri hentes igjen via API
-   - Migrering klar (Prisma client regenerert)
+## In Progress
+- Provider abstraction layer for multiple non-custodial top-up sources.
+- UI integration for virtual card widget.
 
-2. ✅ **JWT-Based Authentication**
-   - 20+ endpoints migrert fra `x-user-id` header til `getUserIdFromRequest()`
-   - Bruker MSAL tokens fra Azure AD B2C cookies
-   - Alle card APIs (`/api/cards/**`) autentisert
-   - Vault API (`/api/wallet/vault`) autentisert
+## Architecture
+```
+User Wallet → Swap (optional) → Provider Top-Up → Provider issues card → Metadata stored (non-sensitive)
+```
 
-3. ✅ **Webhook Security (HMAC + IP Allowlist)**
-   - HMAC-SHA256 signaturverifisering i `/authorize` endpoint
-   - IP allowlist med `CARD_WEBHOOK_IPS` miljøvariabel
+## Security Controls
+| Control | Description |
+|---------|-------------|
+| HMAC verification | Ensures webhook authenticity |
+| Minimal persistence | No PAN, CVV, or seed phrases stored |
+| Ephemeral signing | Wallet signs top-up transactions locally |
+
+## Roadmap
+- [ ] Multi-provider failover
+- [ ] Usage analytics (anonymous counts)
+- [ ] Card freeze/unfreeze via provider API
+
+## Risks
+| Risk | Level | Mitigation |
+|------|-------|-----------|
+| Provider downtime | Medium | Fallback provider list |
+| User misunderstanding of non-custodial model | Medium | Clear UI banners |
+| Excessive metadata logging | Low | Limit fields / periodic audit |
+
+## Notes
+This summary intentionally excludes any legacy vendor cloud references. Feature set remains aligned with principle: user retains crypto custody at all times.
+
    - Provider factory pattern med `verifyWebhook()` interface
    - Highnote provider implementert med signature validation
 
@@ -26,7 +47,7 @@
 
 4. ✅ **Database Migrations Automated**
    - `prisma migrate deploy` lagt til i CI/CD pipeline
-   - Kjøres før deployment til Azure App Service
+   - Kjøres før deployment
    - Bruker `DIRECT_DATABASE_URL` for migrasjon
 
 5. ✅ **Cards Page Route Created**
@@ -42,7 +63,7 @@
 
 ### **Observability & Security (P2) - FULLFØRT**
 
-7. ✅ **Application Insights Telemetry**
+7. ✅ **Telemetry Events**
    - Events tracked:
      * `card.authorization.approved` - Godkjente transaksjoner
      * `card.authorization.declined` - Avslåtte transaksjoner
@@ -69,19 +90,15 @@
 10. ✅ **Highnote Provider Integration Documented**
     - `docs/virtual-cards-production-config.md` (300+ linjer)
     - Webhook setup guide med payload examples
-    - Azure Key Vault setup instructions
-    - Application Insights queries for monitoring
+    - Secret management configuration
+    - Monitoring queries
     - Rollout plan og rollback procedure
     - Security checklist (12 punkter)
 
-11. ✅ **Azure Key Vault Integration**
-    - `src/lib/config/secrets.ts` opprettet
-    - `getSecret()` med caching (5min TTL)
-    - `warmSecretCache()` for app startup
-    - Fallback til environment variables i dev
-    - `DefaultAzureCredential` for Managed Identity
-    - Encryption keys og API secrets via Key Vault
-    - `@azure/keyvault-secrets` og `@azure/identity` allerede installert
+11. ✅ **Secret Management**
+    - Environment-based configuration
+    - Encryption keys stored securely in hosting platform
+    - Caching for performance
 
 12. ✅ **Unit Tests Created**
     - `src/lib/security/__tests__/encryption.test.ts` (140 linjer, 15 test cases)
@@ -133,7 +150,7 @@
 | **AI insights** | ✅ CardInsight model | ❌ Ikke implementert |
 | **Fraud detection** | ✅ Velocity + Geo + MCC | ⚠️ Bare velocity |
 | **Hidden vault** | ✅ PIN-beskyttet hiding | ❌ Ikke tilgjengelig |
-| **Transaction telemetry** | ✅ Application Insights | ⚠️ Basic analytics |
+| **Transaction telemetry** | ✅ Structured events | ⚠️ Basic analytics |
 
 ---
 
@@ -148,35 +165,26 @@
 - [ ] Tests kjørt og passed: `npm test`
 - [ ] Local dev server fungerer: `npm run dev` → `http://localhost:3000/cards`
 
-### **Azure Infrastructure**
+### **Hosting Platform Configuration**
 
-- [ ] **Key Vault**
-  - [ ] Opprett secrets: `card-encryption-key`, `highnote-api-key`, `highnote-api-secret`, `highnote-webhook-secret`
-  - [ ] Grant App Service Managed Identity tilgang (Secret Get/List permissions)
-  - [ ] Sett `AZURE_KEY_VAULT_URL` i App Service configuration
+- [ ] **Environment Variables**
+  - [ ] Set secrets: `ENCRYPTION_KEY`, `HIGHNOTE_API_KEY`, `HIGHNOTE_API_SECRET`, `HIGHNOTE_WEBHOOK_SECRET`
+  - [ ] Set `ENABLE_VIRTUAL_CARDS=true`
+  - [ ] Set `ENABLE_HIDDEN_VAULT=true`
+  - [ ] Set `CASHBACK_TOKEN=CELO`
+  - [ ] Set `CARD_WEBHOOK_IPS=<highnote-ip-ranges>`
 
-- [ ] **App Service Configuration**
-  - [ ] Legg til Key Vault referanser i Application Settings:
-    ```
-    ENCRYPTION_KEY=@Microsoft.KeyVault(SecretUri=https://celora-vault.vault.azure.net/secrets/card-encryption-key/)
-    HIGHNOTE_WEBHOOK_SECRET=@Microsoft.KeyVault(SecretUri=https://celora-vault.vault.azure.net/secrets/highnote-webhook-secret/)
-    ```
-  - [ ] Sett `ENABLE_VIRTUAL_CARDS=true`
-  - [ ] Sett `ENABLE_HIDDEN_VAULT=true`
-  - [ ] Sett `CASHBACK_TOKEN=CELO`
-  - [ ] Sett `CARD_WEBHOOK_IPS=<highnote-ip-ranges>`
-
-- [ ] **Redis Cache**
-  - [ ] Bekreft `REDIS_URL` er satt i App Service
-  - [ ] Test connection fra App Service
+- [ ] **Redis Connection**
+  - [ ] Confirm `REDIS_URL` is configured
+  - [ ] Test connection
 
 - [ ] **PostgreSQL Database**
-  - [ ] Bekreft `DATABASE_URL` og `DIRECT_DATABASE_URL` er satt
-  - [ ] CI/CD pipeline vil kjøre migrations automatisk
+  - [ ] Confirm `DATABASE_URL` and `DIRECT_DATABASE_URL` are set
+  - [ ] CI/CD pipeline will run migrations automatically
 
-- [ ] **Application Insights**
-  - [ ] Bekreft `APPLICATION_INSIGHTS_CONNECTION_STRING` er satt
-  - [ ] Test telemetry flow med dummy data
+- [ ] **Telemetry**
+  - [ ] Verify telemetry configuration
+  - [ ] Test event flow with dummy data
 
 ### **Highnote Provider Setup**
 
@@ -188,7 +196,7 @@
 
 - [ ] **API Credentials**
   - [ ] Generér API key og secret i Highnote dashboard
-  - [ ] Lagre i Azure Key Vault
+  - [ ] Store in hosting platform environment variables
   - [ ] Test med sandbox environment først
 
 ### **Testing & Validation**
@@ -213,8 +221,8 @@
   - [ ] Test blocked MCC (gambling 5993)
 
 - [ ] **Telemetry Validation**
-  - [ ] Query Application Insights:
-    ```kusto
+  - [ ] Query telemetry platform:
+    ```
     customEvents
     | where name startswith "card.authorization"
     | project timestamp, name, customDimensions
@@ -223,7 +231,7 @@
 
 ### **Monitoring Setup**
 
-- [ ] **Azure Monitor Alerts**
+- [ ] **Platform Alerts**
   - [ ] Alert on high authorization failure rate (>100/5min)
   - [ ] Alert on webhook signature failures (>10/min)
   - [ ] Alert on fraud anomalies (>50/hour)
@@ -280,10 +288,6 @@ ENABLE_VIRTUAL_CARDS=true
 ENABLE_HIDDEN_VAULT=true
 ENABLE_FRAUD_MONITORING=true
 
-# Encryption (via Key Vault)
-AZURE_KEY_VAULT_URL=https://celora-vault.vault.azure.net/
-# Secrets: card-encryption-key, highnote-webhook-secret
-
 # Highnote Provider
 HIGHNOTE_API_BASE_URL=https://api.highnote.com/v1
 HIGHNOTE_API_KEY=<from-keyvault>
@@ -331,7 +335,6 @@ APPLICATION_INSIGHTS_CONNECTION_STRING=InstrumentationKey=xxx;...
 - **Internal Docs**: `docs/virtual-cards-production-config.md`
 - **Highnote API**: https://docs.highnote.com
 - **PCI DSS Guide**: https://www.pcisecuritystandards.org
-- **Azure Key Vault**: https://docs.microsoft.com/azure/key-vault
 
 ---
 

@@ -1,19 +1,58 @@
-# Production Deployment Checklist
+# Production Deployment Checklist (Non-Custodial)
 
-This checklist ensures all critical steps are completed before deploying to production.
+Focus: User key safety, deterministic builds, minimal infra.
 
-## Pre-Deployment
+## Environment Variables
+- [ ] RPC_PROVIDER_URL (Solana)
+- [ ] SECONDARY_RPC_URL (fallback)
+- [ ] TELEGRAM_BOT_TOKEN
+- [ ] TELEGRAM_WEBHOOK_SECRET
+- [ ] MOONPAY_PUBLIC_KEY / MOONPAY_API_KEY (optional fiat)
+- [ ] JUPITER_SWAP_API (if custom)
+- [ ] DATABASE_URL (public metadata only)
+- [ ] SENTRY_DSN (optional)
+- [ ] PRICE_FEED_API_URL
 
-### Environment Variables
-- [ ] All required environment variables are set in Azure App Service Configuration
-- [ ] Database connection string is configured and tested
-- [ ] Azure AD B2C credentials are configured
-- [ ] Telegram bot token and webhook secret are set
-- [ ] Card issuing provider API keys are configured (if applicable)
-- [ ] Blockchain RPC URLs are configured for all supported chains
-- [ ] Application Insights instrumentation key is set
-- [ ] Redis connection string is configured (if using Redis cache)
-- [ ] All secrets are stored in Azure Key Vault (not in plain text)
+## Pre-Flight
+- [ ] No private key storage server-side.
+- [ ] Seed phrase UI tested (create/import/backup).
+- [ ] Encryption routine audited.
+- [ ] Dependency audit passes (no high severity vulns).
+- [ ] Bundle size acceptable (< target threshold for perf).
+- [ ] CSP headers active in prod.
+- [ ] Error tracking redacts sensitive data.
+
+## Data Validation
+- [ ] Username uniqueness constraint.
+- [ ] Address format validation (Solana base58) client + server.
+- [ ] Rate limit on username registration endpoint.
+
+## Performance
+- [ ] RPC latency baseline recorded.
+- [ ] WebSocket reconnect logic implemented.
+- [ ] Caching strategy: in-memory + short-lived client caches.
+
+## Observability
+- [ ] Basic heartbeat script deployed.
+- [ ] Alert webhook configured.
+- [ ] Swap / buy flow success metrics logged (count only).
+
+## Security
+- [ ] No eval / dynamic code injection.
+- [ ] Encryption key derivation uses PBKDF2 / Argon2id with strong params.
+- [ ] Sensitive components rendered in isolation route.
+
+## Final
+- [ ] Extension build signed.
+- [ ] Mobile builds uploaded (TestFlight / Play Store internal).
+- [ ] Documentation updated (user backup instructions).
+- [ ] Privacy policy reflects non-custodial nature.
+
+## Post-Deploy
+- [ ] Monitor errors first 24h.
+- [ ] Collect user feedback.
+- [ ] Plan incremental releases (swap, cards, casino presets).
+
 
 ### Database
 - [ ] Database migrations are up to date (`prisma migrate deploy`)
@@ -24,14 +63,14 @@ This checklist ensures all critical steps are completed before deploying to prod
 - [ ] Audit log retention policy is configured
 
 ### Infrastructure
-- [ ] Azure Web App is running on appropriate SKU (at least S1)
-- [ ] Application Insights is enabled and configured
-- [ ] Azure Front Door is configured for CDN and DDoS protection
-- [ ] SSL certificates are valid and auto-renewal is enabled
-- [ ] Custom domain is configured and DNS is pointing correctly
-- [ ] WAF (Web Application Firewall) rules are configured
-- [ ] Auto-scaling rules are set up
-- [ ] Health check endpoint is configured in Azure
+- [ ] Hosting platform selected and sized (Vercel / container / edge)
+- [ ] Basic telemetry enabled (errors + performance) without vendor lock-in
+- [ ] CDN + DDoS protection (provider native or third-party) configured
+- [ ] SSL certificates valid and auto-renewal confirmed
+- [ ] Custom domain pointed and verified
+- [ ] WAF or equivalent filtering (optional if low attack surface)
+- [ ] Auto-scaling / concurrency limits reviewed
+- [ ] Health check endpoint responds with JSON status
 
 ### Security
 - [ ] All secrets have been rotated in the last 90 days
@@ -69,20 +108,18 @@ This checklist ensures all critical steps are completed before deploying to prod
 4. [ ] Run smoke tests on staging
 5. [ ] Deploy to production:
    ```bash
-   # Manual deployment via Azure CLI (if needed)
-   az webapp deployment source sync \
-     --name <PRODUCTION_WEBAPP_NAME> \
-     --resource-group <RESOURCE_GROUP>
+   # Example manual deployment (generic container push)
+   docker build -t celora-app:prod .
+   docker tag celora-app:prod registry.example.com/celora-app:prod
+   docker push registry.example.com/celora-app:prod
    ```
 6. [ ] Run database migrations:
    ```bash
-   az webapp config appsettings set \
-     --name <PRODUCTION_WEBAPP_NAME> \
-     --resource-group <RESOURCE_GROUP> \
-     --settings SKIP_ENV_VALIDATION='true'
-   # Then run migrations via Azure Portal or Kudu console
+   # Run migrations (generic)
+   npx prisma migrate deploy
+   # Optionally skip validations for transient deploy scenarios
    ```
-7. [ ] Verify deployment in Azure Portal
+7. [ ] Verify deployment via hosting provider dashboard
 
 ## Post-Deployment Verification
 

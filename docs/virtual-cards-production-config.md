@@ -1,24 +1,68 @@
-# Virtual Cards Production Configuration Guide
+# Virtual Cards / Spend Layer (Non-Custodial)
 
-## Environment Variables Required
+This guide defines integration patterns that avoid custody and heavy compliance burdens.
 
-### Card Issuing Provider (Highnote)
+## Strategy
+Use third-party providers that: issue cards, perform KYC, hold fiat balances. User funds move directly from their wallet → provider top-up → spend.
 
+## Environment Variables
 ```bash
-# Highnote API Configuration
-HIGHNOTE_API_BASE_URL=https://api.highnote.com/v1  # Production
-# HIGHNOTE_API_BASE_URL=https://api.sandbox.highnote.com/v1  # Sandbox
-HIGHNOTE_API_KEY=<your-highnote-api-key>
-HIGHNOTE_API_SECRET=<your-highnote-api-secret>
-HIGHNOTE_PROGRAM_ID=<your-program-id>
-HIGHNOTE_WEBHOOK_SECRET=<generate-32-char-secret>
-
-# Alternative: Gnosis Pay (Crypto-native)
-GNOSIS_PAY_API_BASE_URL=https://api.gnosis-pay.com
-GNOSIS_PAY_API_KEY=<your-gnosis-api-key>
-GNOSIS_PAY_API_SECRET=<your-gnosis-api-secret>
-GNOSIS_PAY_WEBHOOK_SECRET=<generate-32-char-secret>
+CARD_PROVIDER_API_KEY=<provider-key>
+CARD_PROVIDER_WEBHOOK_SECRET=<32-byte-random>
+FIAT_ONRAMP_PUBLIC_KEY=<optional>
+FIAT_ONRAMP_API_KEY=<optional>
 ```
+
+## Flow Overview
+```
+User Wallet (SOL/USDC) → Swap (optional) → Provider Top-Up Endpoint → Provider Card Balance
+```
+
+## Provider Criteria
+| Requirement | Reason |
+|-------------|--------|
+| Non-custodial top-up | Avoid holding user assets |
+| Transparent fees | User trust |
+| Web widget / SDK | Fast integration |
+| Webhook events | Balance + card status updates |
+
+## Webhook Handling Example
+```ts
+import { NextRequest } from 'next/server';
+export async function POST(req: NextRequest) {
+  const signature = req.headers.get('x-signature');
+  if (!signature || signature !== process.env.CARD_PROVIDER_WEBHOOK_SECRET) {
+    return new Response('unauthorized', { status:401 });
+  }
+  const body = await req.json();
+  // process events: top_up_confirmed, card_activated
+  // store minimal public metadata
+  return new Response('ok');
+}
+```
+
+## UI Components
+- Card widget embedded (iframe/provider Script).
+- Top-up form: amount (USDC) → provider address.
+- Status panel: last 5 card events.
+
+## Security Notes
+- Never request or display full PAN.
+- Store only: last4, brand, expiration month/year (if needed).
+- Hash card id if persisted.
+
+## Monitoring
+- Count top-up attempts vs successes.
+- Track webhook failures.
+
+## Roadmap
+- [ ] Initial provider integration.
+- [ ] Add balance polling fallback.
+- [ ] Multi-provider abstraction.
+
+## Status
+Legacy provider-specific instructions removed. This guide stays generic and compliant.
+
 
 ### Webhook Security
 
@@ -26,9 +70,6 @@ GNOSIS_PAY_WEBHOOK_SECRET=<generate-32-char-secret>
 # Webhook IP Allowlist (comma-separated)
 CARD_WEBHOOK_IPS=52.1.2.3,52.1.2.4,52.1.2.5
 # Leave empty to allow all IPs (NOT recommended for production)
-
-# Alternative: Use Azure Front Door IP ranges
-# Download from: https://www.microsoft.com/en-us/download/details.aspx?id=56519
 ```
 
 ### Encryption & Security
@@ -77,9 +118,7 @@ DIRECT_DATABASE_URL=postgresql://user:pass@host:5432/celora
 ### Redis (Rate Limiting)
 
 ```bash
-# Azure Redis Cache
-REDIS_URL=rediss://:password@celora-cache.redis.cache.windows.net:6380
-AZURE_REDIS_CONNECTION_STRING=<from-azure-portal>
+REDIS_URL=rediss://:password@your-redis-host:6380
 ```
 
 ### Application Insights (Telemetry)
@@ -88,39 +127,6 @@ AZURE_REDIS_CONNECTION_STRING=<from-azure-portal>
 # Telemetry connection string
 APPLICATION_INSIGHTS_CONNECTION_STRING=InstrumentationKey=xxx;IngestionEndpoint=https://xxx
 NEXT_PUBLIC_APPINSIGHTS_INSTRUMENTATION_KEY=<instrumentation-key>
-```
-
-## Azure Key Vault Setup
-
-Move sensitive secrets to Azure Key Vault:
-
-```bash
-# Key Vault URL
-AZURE_KEY_VAULT_URL=https://celora-vault.vault.azure.net/
-
-# Secrets to migrate:
-# - ENCRYPTION_KEY → card-encryption-key
-# - HIGHNOTE_API_KEY → highnote-api-key
-# - HIGHNOTE_API_SECRET → highnote-api-secret
-# - HIGHNOTE_WEBHOOK_SECRET → highnote-webhook-secret
-```
-
-### Runtime Secret Retrieval
-
-Add to `src/lib/config/secrets.ts`:
-
-```typescript
-import { SecretClient } from '@azure/keyvault-secrets';
-import { DefaultAzureCredential } from '@azure/identity';
-
-const keyVaultUrl = process.env.AZURE_KEY_VAULT_URL;
-const credential = new DefaultAzureCredential();
-const client = new SecretClient(keyVaultUrl, credential);
-
-export async function getSecret(name: string): Promise<string> {
-  const secret = await client.getSecret(name);
-  return secret.value || '';
-}
 ```
 
 ## Webhook Registration
@@ -161,19 +167,17 @@ export async function getSecret(name: string): Promise<string> {
 }
 ```
 
-## Azure App Service Configuration
+## Hosting Platform Configuration
 
-### App Settings to Add
+### Environment Variables
 
-```yaml
-# In Azure Portal → App Service → Configuration → Application Settings
-- HIGHNOTE_API_KEY: @Microsoft.KeyVault(SecretUri=https://celora-vault.vault.azure.net/secrets/highnote-api-key/)
-- HIGHNOTE_API_SECRET: @Microsoft.KeyVault(SecretUri=https://celora-vault.vault.azure.net/secrets/highnote-api-secret/)
-- HIGHNOTE_WEBHOOK_SECRET: @Microsoft.KeyVault(SecretUri=https://celora-vault.vault.azure.net/secrets/highnote-webhook-secret/)
-- ENCRYPTION_KEY: @Microsoft.KeyVault(SecretUri=https://celora-vault.vault.azure.net/secrets/card-encryption-key/)
-```
+Configure secrets via your hosting platform's environment variable system (Vercel, Railway, etc.):
+- `HIGHNOTE_API_KEY`
+- `HIGHNOTE_API_SECRET`
+- `HIGHNOTE_WEBHOOK_SECRET`
+- `ENCRYPTION_KEY`
 
-### Managed Identity Permissions
+### Identity & Access
 
 ```bash
 # Grant App Service access to Key Vault
@@ -265,25 +269,9 @@ customEvents
 | summarize count() by bin(timestamp, 5m)
 ```
 
-### Azure Monitor Alerts
-
-```yaml
-# Alert on high authorization failure rate
-- name: "Card Authorization Failure Rate"
-  condition: "customEvents | where name == 'card.authorization.declined' | count > 100 in 5 minutes"
-  severity: "Error"
-  action: "Send email to security@celora.com"
-
-# Alert on webhook signature failures
-- name: "Webhook Security Breach"
-  condition: "customEvents | where name == 'card.authorization.rejected' | count > 10 in 1 minute"
-  severity: "Critical"
-  action: "PagerDuty escalation"
-```
-
 ## Security Checklist
 
-- [ ] All secrets moved to Azure Key Vault
+- [ ] All secrets configured in hosting platform environment variables
 - [ ] Webhook IP allowlist configured
 - [ ] HMAC signature verification enabled
 - [ ] CVV persistence removed (PCI DSS compliance)
@@ -318,11 +306,8 @@ customEvents
 ## Rollback Procedure
 
 ```bash
-# Disable feature flag
-az webapp config appsettings set \
-  --name celora-web \
-  --resource-group celora-prod \
-  --settings ENABLE_VIRTUAL_CARDS=false
+# Disable feature flag via hosting platform environment variables
+# Set ENABLE_VIRTUAL_CARDS=false in dashboard
 
 # Revert code if needed
 git revert <commit-hash>
@@ -334,4 +319,3 @@ git push origin main
 - **Highnote Docs**: https://docs.highnote.com
 - **Gnosis Pay Docs**: https://docs.gnosis-pay.com
 - **PCI DSS Compliance**: https://www.pcisecuritystandards.org
-- **Azure Key Vault**: https://docs.microsoft.com/azure/key-vault

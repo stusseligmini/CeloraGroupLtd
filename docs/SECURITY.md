@@ -24,7 +24,7 @@
 - `/api/cards/**`
 
 ### 2. JWT Verification
-**Status:** Azure B2C token validation implemented
+**Status:** Firebase Auth token validation implemented
 - Signature verification via JWK
 - Issuer/audience checks
 - Expiration validation

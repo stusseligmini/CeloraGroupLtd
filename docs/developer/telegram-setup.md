@@ -4,7 +4,7 @@
 
 - Telegram account
 - Access to Celora backend
-- Azure deployment (for production)
+- Production deployment environment (Firebase/GCP)
 
 ## Step 1: Create Bot via BotFather
 
@@ -64,7 +64,7 @@ Then upload the Celora logo
 
 ## Step 3: Environment Configuration
 
-Add to your `.env.local` or Azure App Settings:
+Add to your `.env.local` or production host settings:
 
 ```env
 # Telegram Bot
@@ -104,7 +104,7 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
   }'
 ```
 
-### Production (Azure)
+### Production Deployment
 
 ```bash
 # Set webhook to production URL
@@ -232,7 +232,7 @@ curl -X POST "http://localhost:3000/api/telegram/webhook" \
 
 ### 1. Keep Token Secret
 - Never commit to git
-- Store in Azure Key Vault (production)
+- Store in your chosen secret manager (production)
 - Rotate if compromised
 
 ### 2. Verify Webhook Signature

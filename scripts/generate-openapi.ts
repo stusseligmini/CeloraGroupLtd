@@ -131,11 +131,11 @@ const openApiSpec = {
     { name: 'Diagnostics', description: 'Health checks and system status' },
   ],
   paths: {
-    '/auth/b2c/session': {
+    '/auth/session': {
       post: {
         tags: ['Auth'],
         summary: 'Create session',
-        description: 'Creates a new session with MSAL tokens',
+        description: 'Creates a new session using Firebase ID token exchange',
         operationId: 'createSession',
         requestBody: {
           required: true,
@@ -493,7 +493,7 @@ const openApiSpec = {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: 'MSAL access token from Azure B2C',
+        description: 'Firebase ID token (bearer)',
       },
     },
     schemas: {

@@ -35,7 +35,7 @@ export async function mockAuth(context: BrowserContext, userId: string = 'test-u
 
 /**
  * Create a mock JWT token for testing
- * In production, this would be a real Azure B2C token
+ * In production, this would be a real Firebase ID token
  */
 function createMockToken(userId: string): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');

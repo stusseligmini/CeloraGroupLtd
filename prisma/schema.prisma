@@ -14,10 +14,9 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
-// User account model (synced with Azure AD B2C)
+// User account model (Firebase Auth)
 model User {
   id            String   @id @default(uuid())
-  azureB2CId    String   @unique @map("azure_b2c_id")
   email         String   @unique
   emailVerified Boolean  @default(false) @map("email_verified")
   
@@ -54,7 +53,6 @@ model User {
   receivedPaymentRequests PaymentRequest[]  @relation("ReceivedPaymentRequests")
   
   @@map("users")
-  @@index([azureB2CId])
   @@index([email])
 }
 

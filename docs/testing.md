@@ -86,7 +86,7 @@ open coverage/lcov-report/index.html
 
 ### 3. Security Middleware (`security.test.ts`)
 ✅ CSP nonce generation (uniqueness, base64 encoding)
-✅ CSP directive building (Azure domains, App Insights)
+✅ CSP directive building (restricted to required Firebase/first-party domains)
 ✅ CSRF token generation (cryptographic security)
 ✅ Security integration tests
 
@@ -233,20 +233,27 @@ npm test -- --detectOpenHandles
 
 ## CI/CD Integration
 
-Tests run automatically in pipeline:
+Tests run automatically in a neutral CI pipeline (e.g., GitHub Actions):
 
 ```yaml
-# azure-devops/pipelines/app-ci-cd.yml
-- task: Npm@1
-  inputs:
-    command: 'custom'
-    customCommand: 'test -- --coverage --ci'
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test -- --coverage --ci
 ```
 
 Quality gates:
 - ✅ All tests must pass
 - ✅ Coverage ≥70% on all metrics
-- ✅ No console errors/warnings
+- ✅ No unexpected console errors/warnings
 
 ## Troubleshooting
 

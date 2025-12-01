@@ -37,7 +37,6 @@ async function main() {
   
   const user1 = await prisma.user.create({
     data: {
-      azureB2CId: randomUUID(),
       email: 'alice@celora.io',
       emailVerified: true,
       displayName: 'Alice Johnson',
@@ -49,7 +48,6 @@ async function main() {
 
   const user2 = await prisma.user.create({
     data: {
-      azureB2CId: randomUUID(),
       email: 'bob@celora.io',
       emailVerified: true,
       displayName: 'Bob Smith',

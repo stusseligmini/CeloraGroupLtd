@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 
 interface Wallet {
   id: string;
@@ -31,7 +32,7 @@ export default function SendPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -43,16 +44,10 @@ export default function SendPage() {
 
   const fetchWallets = async () => {
     try {
-      const response = await fetch('/api/wallet/list', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setWallets(data.wallets || []);
-        if (data.wallets?.length > 0) {
-          setSelectedWallet(data.wallets[0].id);
-        }
+      const data = await api.get<{ wallets: Wallet[] }>('/wallet/list');
+      setWallets(data.wallets || []);
+      if (data.wallets?.length > 0) {
+        setSelectedWallet(data.wallets[0].id);
       }
     } catch (err) {
       console.error('Error fetching wallets:', err);
@@ -126,34 +121,20 @@ export default function SendPage() {
         throw new Error('Wallet not found');
       }
 
-      const endpoint =
+      const path =
         selectedWalletData.blockchain.toLowerCase() === 'solana'
-          ? '/api/solana/send'
+          ? '/solana/send'
           : selectedWalletData.blockchain.toLowerCase() === 'ethereum'
-          ? '/api/ethereum/send'
-          : '/api/bitcoin/send';
+          ? '/ethereum/send'
+          : '/bitcoin/send';
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          walletId: selectedWallet,
-          toAddress,
-          amount: parseFloat(amount),
-          priorityFee: priorityFee,
-          memo: memo || undefined,
-        }),
+      const data = await api.post<any>(path, {
+        walletId: selectedWallet,
+        toAddress,
+        amount: parseFloat(amount),
+        priorityFee: priorityFee,
+        memo: memo || undefined,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send transaction');
-      }
-
-      const data = await response.json();
       setTxSignature(data.signature || data.txHash || data.txid);
       setStep(5); // Success step
     } catch (err: any) {

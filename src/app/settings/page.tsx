@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 
 interface UserProfile {
   email: string;
@@ -24,27 +25,24 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
+    } else {
+      setProfile(null);
+      setDisplayName('');
     }
   }, [user]);
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch('/api/user/profile', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data.profile);
-        setDisplayName(data.profile.displayName || '');
-      }
+      const data = await api.get<{ profile: UserProfile }>('/user/profile');
+      setProfile(data.profile);
+      setDisplayName(data.profile.displayName || '');
     } catch (err) {
       console.error('Error fetching profile:', err);
     }
@@ -56,23 +54,11 @@ export default function SettingsPage() {
       setError(null);
       setSuccess(null);
 
-      const response = await fetch('/api/user/profile', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          displayName,
-        }),
-      });
+      const data = await api.patch<{ profile: UserProfile }>(
+        '/user/profile',
+        { displayName }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile');
-      }
-
-      const data = await response.json();
       setProfile(data.profile);
       setSuccess('Profile updated successfully');
     } catch (err: any) {
@@ -101,12 +87,12 @@ export default function SettingsPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
+          <h1 className="text-3xl font-bold heading-gradient mb-2">Settings</h1>
           <p className="text-gray-400">Manage your account preferences</p>
         </div>
 
         {/* Navigation tabs */}
-        <div className="modern-card p-2">
+        <div className="glass-panel border-gradient p-2">
           <div className="flex gap-2 overflow-x-auto">
             <button
               onClick={() => router.push('/settings')}
@@ -136,7 +122,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Profile settings */}
-        <div className="modern-card p-6 space-y-6">
+        <div className="glass-panel border-gradient p-6 space-y-6">
           <h2 className="text-2xl font-bold text-white">Profile Information</h2>
 
           <div className="space-y-4">
@@ -207,14 +193,14 @@ export default function SettingsPage() {
           <button
             onClick={handleUpdateProfile}
             disabled={isLoading || displayName === profile.displayName}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary ring-glow disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
 
         {/* Danger zone */}
-        <div className="modern-card p-6 space-y-4 border-2 border-red-500/30">
+        <div className="glass-panel p-6 space-y-4 border-2 border-red-500/30">
           <h2 className="text-2xl font-bold text-red-400">Danger Zone</h2>
           <p className="text-gray-400">Irreversible and destructive actions</p>
 

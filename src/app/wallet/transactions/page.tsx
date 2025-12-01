@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { api } from '@/lib/apiClient';
 
 interface Transaction {
   id: string;
@@ -53,7 +54,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -93,20 +94,16 @@ export default function TransactionsPage() {
       const cardId = searchParams?.get('card');
       if (cardId) params.append('cardId', cardId);
 
-      const response = await fetch(`/api/wallet/transactions?${params.toString()}`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (reset) {
-          setTransactions(data.transactions || []);
-        } else {
-          setTransactions((prev) => [...prev, ...(data.transactions || [])]);
-        }
-        setHasMore(data.hasMore || false);
-        setPage(currentPage + 1);
+      const data = await api.get<{ transactions: Transaction[]; hasMore: boolean }>(
+        `/wallet/transactions?${params.toString()}`
+      );
+      if (reset) {
+        setTransactions(data.transactions || []);
+      } else {
+        setTransactions((prev) => [...prev, ...(data.transactions || [])]);
       }
+      setHasMore(data.hasMore || false);
+      setPage(currentPage + 1);
     } catch (err) {
       console.error('Error fetching transactions:', err);
     } finally {
@@ -216,13 +213,13 @@ export default function TransactionsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
+            <h1 className="text-3xl font-bold heading-gradient mb-2">Transaction History</h1>
             <p className="text-gray-400">Track all your wallet and card activity</p>
           </div>
           <button
             onClick={exportToCSV}
             disabled={transactions.length === 0}
-            className="btn-outline flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-outline ring-glow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -232,7 +229,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Filters */}
-        <div className="modern-card p-6 space-y-4">
+        <div className="glass-panel border-gradient p-6 space-y-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-white">Filters</h2>
             <button
@@ -367,7 +364,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Transactions list */}
-        <div className="modern-card p-6">
+        <div className="glass-panel border-gradient p-6">
           {isLoading && transactions.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="cel-loading">
@@ -467,7 +464,7 @@ export default function TransactionsPage() {
           onClick={() => setSelectedTransaction(null)}
         >
           <div
-            className="modern-card p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="glass-panel border-gradient p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-6">

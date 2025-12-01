@@ -5,6 +5,7 @@ import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { api } from '@/lib/apiClient';
 
 interface Card {
   id: string;
@@ -27,7 +28,7 @@ export default function CardsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -44,15 +45,7 @@ export default function CardsPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch('/api/cards', {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch cards');
-      }
-
-      const data = await response.json();
+      const data = await api.get<{ cards: Card[] }>('/cards');
       setCards(data.cards || []);
     } catch (err) {
       console.error('Error fetching cards:', err);
@@ -103,7 +96,7 @@ export default function CardsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Virtual Cards</h1>
+            <h1 className="text-3xl font-bold heading-gradient mb-2">Virtual Cards</h1>
             <p className="text-gray-400">Manage your VISA & Mastercard virtual cards</p>
           </div>
 
@@ -149,7 +142,7 @@ export default function CardsPage() {
             {/* Create card button */}
             <Link
               href="/cards/create"
-              className="btn-primary px-6 py-3 text-sm font-bold inline-flex items-center gap-2"
+              className="btn-primary ring-glow px-6 py-3 text-sm font-bold inline-flex items-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -181,7 +174,7 @@ export default function CardsPage() {
 
         {/* Empty state */}
         {!isLoading && !error && cards.length === 0 && (
-          <div className="modern-card p-12 text-center">
+          <div className="glass-panel border-gradient p-12 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-cyan-primary/10 flex items-center justify-center">
               <svg
                 className="w-10 h-10 text-cyan-primary"
@@ -201,7 +194,7 @@ export default function CardsPage() {
             <p className="text-gray-400 mb-6">
               Create your first virtual card to start spending with crypto cashback
             </p>
-            <Link href="/cards/create" className="btn-primary px-8 py-3 inline-block">
+            <Link href="/cards/create" className="btn-primary ring-glow px-8 py-3 inline-block">
               Create Your First Card
             </Link>
           </div>
@@ -220,7 +213,7 @@ export default function CardsPage() {
                 <Link
                   key={card.id}
                   href={`/cards/${card.id}`}
-                  className="modern-card p-6 space-y-4 group cursor-pointer"
+                  className="glass-panel border-gradient hover-lift p-6 space-y-4 group cursor-pointer"
                 >
                   {/* Card header */}
                   <div className="flex items-center justify-between">
@@ -279,7 +272,7 @@ export default function CardsPage() {
 
         {/* Cards list view */}
         {!isLoading && !error && cards.length > 0 && viewMode === 'list' && (
-          <div className="modern-card divide-y divide-gray-700">
+          <div className="glass-panel border-gradient divide-y divide-gray-700">
             {cards.map((card) => {
               const spendingPercentage = calculateSpendingPercentage(
                 card.currentSpending,

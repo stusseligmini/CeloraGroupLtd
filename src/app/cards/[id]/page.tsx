@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
+import { api } from '@/lib/apiClient';
 
 interface Card {
   id: string;
@@ -73,15 +74,9 @@ export default function CardDetailsPage() {
   const fetchCardDetails = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/cards/${cardId}`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch card details');
-      }
-
-      const data = await response.json();
+      const data = await api.get<{ card: Card; spendingByCategory?: SpendingByCategory[] }>(
+        `/cards/${cardId}`
+      );
       setCard(data.card);
       
       // Calculate spending by category
@@ -98,14 +93,10 @@ export default function CardDetailsPage() {
 
   const fetchTransactions = async () => {
     try {
-      const response = await fetch(`/api/cards/${cardId}/transactions?limit=20`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTransactions(data.transactions || []);
-      }
+      const data = await api.get<{ transactions: Transaction[] }>(
+        `/cards/${cardId}/transactions?limit=20`
+      );
+      setTransactions(data.transactions || []);
     } catch (err) {
       console.error('Error fetching transactions:', err);
     }
@@ -118,18 +109,7 @@ export default function CardDetailsPage() {
       setActionLoading(true);
       const newStatus = card.status === 'ACTIVE' ? 'FROZEN' : 'ACTIVE';
 
-      const response = await fetch(`/api/cards/${cardId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update card status');
-      }
+      await api.patch(`/cards/${cardId}/status`, { status: newStatus });
 
       setCard({ ...card, status: newStatus });
     } catch (err: any) {
@@ -152,14 +132,7 @@ export default function CardDetailsPage() {
     try {
       setActionLoading(true);
 
-      const response = await fetch(`/api/cards/${cardId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to cancel card');
-      }
+      await api.delete(`/cards/${cardId}`);
 
       alert('Card cancelled successfully');
       router.push('/cards');

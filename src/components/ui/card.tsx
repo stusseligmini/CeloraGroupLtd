@@ -1,4 +1,4 @@
-// Basic UI Card component
+// Modern Celora Card primitives (glass + gradient border)
 import React from 'react';
 
 export const Card = ({ children, className = '', ...props }: {
@@ -6,9 +6,9 @@ export const Card = ({ children, className = '', ...props }: {
   className?: string;
   [key: string]: any;
 }) => (
-  <div className={`bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden ${className}`} {...props}>
+  <section className={`glass-panel border-gradient hover-lift ${className}`} {...props}>
     {children}
-  </div>
+  </section>
 );
 
 export const CardHeader = ({ children, className = '', ...props }: {
@@ -16,9 +16,9 @@ export const CardHeader = ({ children, className = '', ...props }: {
   className?: string;
   [key: string]: any;
 }) => (
-  <div className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${className}`} {...props}>
+  <header className={`cel-card__header ${className}`} {...props}>
     {children}
-  </div>
+  </header>
 );
 
 export const CardTitle = ({ children, className = '', ...props }: {
@@ -26,7 +26,7 @@ export const CardTitle = ({ children, className = '', ...props }: {
   className?: string;
   [key: string]: any;
 }) => (
-  <h2 className={`text-lg font-semibold text-gray-900 dark:text-white ${className}`} {...props}>
+  <h2 className={`cel-title ${className}`} {...props}>
     {children}
   </h2>
 );
@@ -36,7 +36,7 @@ export const CardDescription = ({ children, className = '', ...props }: {
   className?: string;
   [key: string]: any;
 }) => (
-  <p className={`text-sm text-gray-600 dark:text-gray-400 ${className}`} {...props}>
+  <p className={`cel-body ${className}`} {...props}>
     {children}
   </p>
 );
@@ -46,7 +46,7 @@ export const CardContent = ({ children, className = '', ...props }: {
   className?: string;
   [key: string]: any;
 }) => (
-  <div className={`px-6 py-4 ${className}`} {...props}>
+  <div className={`cel-card__content ${className}`} {...props}>
     {children}
   </div>
 );
@@ -56,7 +56,7 @@ export const CardFooter = ({ children, className = '', ...props }: {
   className?: string;
   [key: string]: any;
 }) => (
-  <div className={`px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 ${className}`} {...props}>
+  <footer className={`cel-card__footer ${className}`} {...props}>
     {children}
-  </div>
+  </footer>
 );

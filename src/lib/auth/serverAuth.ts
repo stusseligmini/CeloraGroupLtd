@@ -25,25 +25,42 @@ export interface AuthenticatedUser {
  */
 export async function getUserFromRequest(request: NextRequest): Promise<AuthenticatedUser | null> {
   try {
-    // Get Firebase ID token from cookies
-    // Check multiple cookie names for compatibility
+    // 1) Try Authorization header (Bearer token)
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const bearerToken = authHeader.slice('Bearer '.length).trim();
+      if (bearerToken) {
+        try {
+          const decodedToken = await verifyIdToken(bearerToken);
+          return {
+            id: decodedToken.uid,
+            email: decodedToken.email,
+            emailVerified: decodedToken.email_verified || false,
+            roles: (decodedToken.roles as string[]) || [],
+            authTime: decodedToken.auth_time,
+          };
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[Auth] Bearer token verification failed, falling back to cookies');
+          }
+        }
+      }
+    }
+
+    // 2) Fallback: Firebase ID token from cookies (multiple names for compatibility)
     const idToken = request.cookies.get(ID_TOKEN_COOKIE)?.value || 
                     request.cookies.get(AUTH_TOKEN_COOKIE)?.value ||
                     request.cookies.get('firebase-id-token')?.value ||
                     request.cookies.get('auth-token')?.value;
-    
+
     if (!idToken) {
-      // No token found - check if this is a development request
       if (process.env.NODE_ENV === 'development') {
         console.debug('[Auth] No Firebase ID token found in cookies');
       }
       return null;
     }
 
-    // Verify Firebase ID token
     const decodedToken = await verifyIdToken(idToken);
-
-    // Extract user information from Firebase token
     return {
       id: decodedToken.uid,
       email: decodedToken.email,
@@ -52,7 +69,6 @@ export async function getUserFromRequest(request: NextRequest): Promise<Authenti
       authTime: decodedToken.auth_time,
     };
   } catch (error) {
-    // Token is invalid or expired
     if (process.env.NODE_ENV === 'development') {
       console.error('[Auth] Token verification failed:', error);
     }

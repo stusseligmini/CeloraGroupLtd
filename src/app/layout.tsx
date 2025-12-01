@@ -1,10 +1,14 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { AuthProvider } from '../providers/AuthProvider'
+import { ThemeProvider } from '../providers/ThemeProvider'
+import { ToastProvider } from '../providers/ToastProvider'
+import { DevToolsWarning } from '../components/security/DevToolsWarning'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration'
 import { TelemetryProvider } from '../components/TelemetryProvider'
 import { TelegramMiniAppProvider } from '../components/telegram/TelegramMiniAppProvider'
+import { AppCheckProvider } from '../providers/AppCheckProvider'
 import { headers } from 'next/headers'
 import { CspNonceProvider } from '../lib/cspHelpers'
 
@@ -63,14 +67,22 @@ export default async function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-96x96.png" />
       </head>
       <body className="min-h-screen bg-slate-900 antialiased">
-        <TelemetryProvider>
-          <ErrorBoundary>
-            <TelegramMiniAppProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </TelegramMiniAppProvider>
-          </ErrorBoundary>
-          <ServiceWorkerRegistration />
-        </TelemetryProvider>
+        <ThemeProvider>
+          <TelemetryProvider>
+            <ErrorBoundary>
+              <TelegramMiniAppProvider>
+                <AuthProvider>
+                  <AppCheckProvider>
+                    {children}
+                  </AppCheckProvider>
+                </AuthProvider>
+              </TelegramMiniAppProvider>
+            </ErrorBoundary>
+            <DevToolsWarning />
+            <ToastProvider />
+            <ServiceWorkerRegistration />
+          </TelemetryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

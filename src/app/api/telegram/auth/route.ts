@@ -4,31 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getFirebaseAdmin } from '@/lib/firebase/admin';
 
 export const runtime = 'nodejs';
 
-// Initialize Firebase Admin (only once)
-if (getApps().length === 0) {
-  const keyPath = process.env.FIREBASE_ADMIN_KEY_PATH || './firebase-admin-key.json';
-  const absolutePath = path.resolve(process.cwd(), keyPath);
-  
-  if (fs.existsSync(absolutePath)) {
-    const serviceAccount = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
-    initializeApp({
-      credential: cert(serviceAccount),
-    });
-  } else {
-    // Fallback: use project ID only (limited functionality)
-    console.warn('Firebase Admin key not found, using project ID only');
-    initializeApp({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'celora-7b552',
-    });
-  }
-}
+// Ensure admin initialized via shared helper
+getFirebaseAdmin();
 
 /**
  * POST /api/telegram/auth

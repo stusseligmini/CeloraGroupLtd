@@ -9,6 +9,7 @@ import { showBackButton, hideMainButton, haptic } from '@/lib/telegram/webapp';
 import { useRouter } from 'next/navigation';
 import type { VirtualCard } from '@/types/api';
 import { logger } from '@/lib/logger';
+import { api } from '@/lib/apiClient';
 
 export default function TelegramCardsPage() {
   const router = useRouter();
@@ -23,13 +24,10 @@ export default function TelegramCardsPage() {
   
   const loadCards = async () => {
     try {
-      const response = await fetch('/api/cards', {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCards(data.data.cards);
-      }
+      const data = await api.get<{ cards: VirtualCard[] }>(
+        '/cards'
+      );
+      setCards(data.cards || []);
     } catch (error) {
       logger.error('Failed to load cards', error instanceof Error ? error : undefined);
     } finally {
@@ -40,12 +38,7 @@ export default function TelegramCardsPage() {
   const handleFreeze = async (cardId: string) => {
     haptic('impact');
     try {
-      await fetch(`/api/cards/${cardId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'frozen' }),
-      });
+      await api.patch(`/cards/${cardId}`, { status: 'frozen' });
       await loadCards();
       haptic('notification', 'success');
     } catch (error) {
@@ -56,12 +49,7 @@ export default function TelegramCardsPage() {
   const handleUnfreeze = async (cardId: string) => {
     haptic('impact');
     try {
-      await fetch(`/api/cards/${cardId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'active' }),
-      });
+      await api.patch(`/cards/${cardId}`, { status: 'active' });
       await loadCards();
       haptic('notification', 'success');
     } catch (error) {

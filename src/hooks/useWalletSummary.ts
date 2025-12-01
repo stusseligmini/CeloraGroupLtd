@@ -28,13 +28,17 @@ export function useWalletSummary() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
-      const response = await api.get<{ success: boolean; summary: WalletSummary }>('/wallet/summary', {
+      // API returns successResponse(payload), which wraps data under { success: true, data: {...} }
+      // successResponse() returns data directly, not wrapped
+      const response = await api.get<WalletSummary>('/wallet/summary', {
         headers: user.id ? { 'X-User-Id': user.id } : undefined,
       });
 
-      if (response?.summary) {
-        setState({ summary: response.summary, loading: false, error: null });
+      // successResponse() returns the validated data directly
+      if (response && typeof response === 'object') {
+        setState({ summary: response, loading: false, error: null });
       } else {
+        console.error('Invalid wallet summary response:', response);
         throw new Error('Invalid wallet summary response');
       }
     } catch (error) {

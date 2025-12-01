@@ -42,10 +42,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Disable ESLint during production builds on CI to avoid config format mismatches
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Note: Next.js no longer supports `eslint` option here; removed to silence warning
   
   // Enhanced security headers
   async headers() {
@@ -83,6 +80,10 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.helius-rpc.com https://api.coingecko.com https://*.solana.com https://*.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://firestore.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.helius-rpc.com wss://api.devnet.solana.com wss://*.solana.com; frame-ancestors 'none';",
+          },
         ],
       },
       {
@@ -93,6 +94,30 @@ const nextConfig = {
             value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
           },
         ],
+      },
+    ];
+  },
+
+  // Friendly asset aliases so we can standardize public paths without moving files
+  async rewrites() {
+    return [
+      // Proxy legacy middleware responsibilities to destinations as needed
+      {
+        source: '/images/celora-wordmark.png',
+        destination: '/b3bdb21c-1e40-42a7-b4c4-d45543aa4159.png',
+      },
+      {
+        source: '/images/celora-lock.png',
+        destination: '/images/93bd0c27-6490-469d-a1d9-8cde4626aa08.png',
+      },
+      // Example proxies (adjust as required):
+      {
+        source: '/api/username',
+        destination: '/api/username',
+      },
+      {
+        source: '/offline',
+        destination: '/offline',
       },
     ];
   },

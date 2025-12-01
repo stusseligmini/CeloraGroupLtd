@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { CeloraLogo } from '@/components/ui/CeloraLogo';
 
 type AppShellVariant = 'pwa' | 'extension';
 
@@ -38,10 +39,13 @@ export function AppShell({
   return (
     <div className={`cel-shell cel-shell--${variant}`}>
       <header className="cel-shell__header">
-        <div>
-          <p className="cel-shell__eyebrow">Celora</p>
-          <h1 className="cel-shell__title">{title}</h1>
-          <p className="cel-shell__subtitle">{subtitle}</p>
+        <div className="flex items-center gap-3">
+          <CeloraLogo size="xs" />
+          <div>
+            <p className="cel-shell__eyebrow">Celora</p>
+            <h1 className="cel-shell__title">{title}</h1>
+            <p className="cel-shell__subtitle">{subtitle}</p>
+          </div>
         </div>
 
         <div className="cel-shell__actions">

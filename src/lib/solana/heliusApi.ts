@@ -6,8 +6,10 @@
 
 import axios from 'axios';
 
-const HELIUS_API_URL = 'https://api.helius.xyz/v0';
-const HELIUS_API_KEY = process.env.NEXT_PUBLIC_HELIUS_API_KEY || process.env.HELIUS_API_KEY;
+// Use devnet for testing
+const HELIUS_API_URL = 'https://api-devnet.helius-rpc.com/v0';
+// Server-side only: never expose to client
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 
 export interface HeliusTransaction {
   signature: string;
@@ -71,17 +73,18 @@ export async function getHeliusTransactionHistory(
   }
 
   try {
-    const response = await axios.post(
-      `${HELIUS_API_URL}/addresses/${params.address}/transactions`,
-      {
-        apiKey: HELIUS_API_KEY,
+    // Use GET request with query params for devnet Enhanced API
+    const url = `${HELIUS_API_URL}/addresses/${params.address}/transactions?api-key=${HELIUS_API_KEY}`;
+    
+    const response = await axios.get(url, {
+      params: {
         before: params.before,
         until: params.until,
         limit: params.limit || 100,
         type: params.type,
         commitment: params.commitment || 'confirmed',
       }
-    );
+    });
 
     return response.data || [];
   } catch (error) {
@@ -100,17 +103,13 @@ export async function getHeliusTransaction(signature: string): Promise<HeliusTra
   }
 
   try {
-    const response = await axios.post(
-      `${HELIUS_API_URL}/transactions`,
-      {
-        transactions: [signature],
-      },
-      {
-        params: {
-          'api-key': HELIUS_API_KEY,
-        },
+    const url = `${HELIUS_API_URL}/transactions?api-key=${HELIUS_API_KEY}`;
+    
+    const response = await axios.get(url, {
+      params: {
+        transactions: signature,
       }
-    );
+    });
 
     return response.data?.[0] || null;
   } catch (error) {

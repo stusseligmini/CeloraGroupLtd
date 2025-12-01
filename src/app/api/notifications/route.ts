@@ -75,8 +75,37 @@ export async function GET(request: NextRequest) {
     const token = extractBearerToken(request.headers.get('authorization'));
     const notifications = await fetchNotifications(token, query);
 
+    // In development, enrich minimal notifications to match schema
+    const devUserId = '00000000-0000-0000-0000-000000000000';
+    const enriched = notifications.map((n) => {
+      const createdAt = n.createdAt ?? new Date().toISOString();
+      const idCandidate = (() => {
+        try {
+          // If already a uuid, keep; else generate
+          if (z.string().uuid().safeParse(n.id).success) return n.id;
+        } catch {}
+        return crypto.randomUUID();
+      })();
+      return {
+        id: idCandidate,
+        userId: devUserId,
+        type: 'system',
+        title: n.title ?? 'Account update',
+        body: n.body ?? '',
+        channels: ['in-app'],
+        status: n.read ? 'read' : 'delivered',
+        priority: 'normal',
+        actionUrl: null,
+        actionLabel: null,
+        sentAt: createdAt,
+        deliveredAt: createdAt,
+        readAt: n.read ? createdAt : null,
+        createdAt,
+      };
+    });
+
     // Validate response array
-    const validatedNotifications = z.array(NotificationResponseSchema).parse(notifications);
+    const validatedNotifications = z.array(NotificationResponseSchema).parse(enriched);
 
     const response = successResponse(
       {

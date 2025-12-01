@@ -18,7 +18,7 @@ import { deriveSolanaWallet } from '@/lib/solana/solanaWallet';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/providers/AuthProvider';
 
-type Step = 'generate' | 'backup' | 'password' | 'confirm' | 'complete';
+type Step = 'generate' | 'backup' | 'verify' | 'password' | 'complete';
 
 interface PasswordStrength {
   score: number; // 0-4 (0=weak, 4=very strong)
@@ -77,6 +77,21 @@ export function CreateSolanaWallet() {
   const [error, setError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [walletPublicKey, setWalletPublicKey] = useState<string>('');
+  
+  // Verification state
+  const [verificationWords, setVerificationWords] = useState<{ index: number; word: string }[]>([]);
+  const [userAnswers, setUserAnswers] = useState<string[]>(['', '', '']);
+  const [verificationError, setVerificationError] = useState<string>('');
+
+  // SECURITY: Cleanup sensitive data on unmount
+  useEffect(() => {
+    return () => {
+      setMnemonic('');
+      setPassword('');
+      setConfirmPassword('');
+      setUserAnswers(['', '', '']);
+    };
+  }, []);
 
   // Generate mnemonic on mount
   useEffect(() => {
@@ -128,12 +143,46 @@ export function CreateSolanaWallet() {
     setRevealMnemonic(true);
   };
 
-  // Proceed to password step
-  const handleProceedToPassword = () => {
+  // Proceed to verification step
+  const handleProceedToVerify = () => {
     if (!mnemonicConfirmed) {
       setError('Please confirm you have backed up your mnemonic phrase');
       return;
     }
+    
+    // Generate 3 random word positions to verify
+    const words = mnemonic.split(' ');
+    const positions: number[] = [];
+    while (positions.length < 3) {
+      const randomPos = Math.floor(Math.random() * words.length);
+      if (!positions.includes(randomPos)) {
+        positions.push(randomPos);
+      }
+    }
+    
+    const verifyWords = positions.sort((a, b) => a - b).map(pos => ({
+      index: pos,
+      word: words[pos]
+    }));
+    
+    setVerificationWords(verifyWords);
+    setUserAnswers(['', '', '']);
+    setVerificationError('');
+    setStep('verify');
+  };
+  
+  // Verify seed phrase
+  const handleVerifySeedPhrase = () => {
+    const isCorrect = verificationWords.every((item, idx) => 
+      userAnswers[idx].toLowerCase().trim() === item.word.toLowerCase()
+    );
+    
+    if (!isCorrect) {
+      setVerificationError('Incorrect words. Please check your recovery phrase and try again.');
+      return;
+    }
+    
+    setVerificationError('');
     setStep('password');
   };
 
@@ -211,6 +260,11 @@ export function CreateSolanaWallet() {
 
       // Step 6: Move to complete step
       setStep('complete');
+      
+      // SECURITY: Clear sensitive data from memory
+      setMnemonic('');
+      setPassword('');
+      setConfirmPassword('');
     } catch (err: any) {
       setError(err.message || 'Failed to create wallet');
       console.error('Error creating wallet:', err);
@@ -346,11 +400,73 @@ export function CreateSolanaWallet() {
                 Back
               </Button>
               <Button
-                onClick={handleProceedToPassword}
+                onClick={handleProceedToVerify}
                 disabled={!mnemonicConfirmed}
                 className="flex-1"
               >
                 Continue
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'verify':
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold mb-2">Verify Your Recovery Phrase</h3>
+              <p className="text-gray-600">
+                To make sure you've backed up your phrase correctly, please enter the words at the following positions:
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {verificationWords.map((item, idx) => (
+                <div key={idx} className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Word #{item.index + 1}
+                  </label>
+                  <Input
+                    type="text"
+                    value={userAnswers[idx]}
+                    onChange={(e) => {
+                      const newAnswers = [...userAnswers];
+                      newAnswers[idx] = e.target.value;
+                      setUserAnswers(newAnswers);
+                      setVerificationError('');
+                    }}
+                    placeholder={`Enter word #${item.index + 1}`}
+                    className="font-mono"
+                    autoComplete="off"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {verificationError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">{verificationError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStep('backup');
+                  setVerificationError('');
+                  setUserAnswers(['', '', '']);
+                }}
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleVerifySeedPhrase}
+                disabled={userAnswers.some(answer => !answer.trim())}
+                className="flex-1"
+              >
+                Verify & Continue
               </Button>
             </div>
           </div>
@@ -494,6 +610,7 @@ export function CreateSolanaWallet() {
         <CardDescription>
           {step === 'generate' && 'Generate your recovery phrase'}
           {step === 'backup' && 'Back up your recovery phrase'}
+          {step === 'verify' && 'Verify your recovery phrase'}
           {step === 'password' && 'Set your password'}
           {step === 'complete' && 'Wallet created successfully'}
         </CardDescription>
@@ -501,21 +618,21 @@ export function CreateSolanaWallet() {
       <CardContent>
         {/* Progress indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          {['generate', 'backup', 'password', 'complete'].map((s, index) => (
+          {['generate', 'backup', 'verify', 'password', 'complete'].map((s, index) => (
             <React.Fragment key={s}>
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  ['generate', 'backup', 'password', 'complete'].indexOf(step) >= index
+                  ['generate', 'backup', 'verify', 'password', 'complete'].indexOf(step) >= index
                     ? 'bg-cyan-600 text-white'
                     : 'bg-gray-200 text-gray-600'
                 }`}
               >
                 {index + 1}
               </div>
-              {index < 3 && (
+              {index < 4 && (
                 <div
                   className={`w-12 h-1 ${
-                    ['generate', 'backup', 'password', 'complete'].indexOf(step) > index
+                    ['generate', 'backup', 'verify', 'password', 'complete'].indexOf(step) > index
                       ? 'bg-cyan-600'
                       : 'bg-gray-200'
                   }`}

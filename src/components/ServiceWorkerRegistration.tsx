@@ -11,11 +11,16 @@ export default function ServiceWorkerRegistration() {
   const [workbox, setWorkbox] = useState<Workbox | null>(null);
 
   useEffect(() => {
+    // Disable service worker in development to avoid errors
+    if (process.env.NODE_ENV === 'development') {
+      return;
+    }
+    
     // Only register in secure contexts (HTTPS or localhost)
     const isSecureContext = window.location.protocol === 'https:' || 
                           window.location.hostname === 'localhost';
     
-    if ('serviceWorker' in navigator && (isSecureContext || process.env.NODE_ENV === 'development')) {
+    if ('serviceWorker' in navigator && isSecureContext) {
       registerServiceWorkerWithWorkbox();
     }
     

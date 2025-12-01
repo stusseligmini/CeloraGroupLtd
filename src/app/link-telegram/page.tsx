@@ -19,7 +19,7 @@ export default function LinkTelegramPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const telegramId = searchParams.get('telegram_id');
+  const telegramId = searchParams?.get('telegram_id') || null;
 
   useEffect(() => {
     // If Telegram user is available and user is authenticated, auto-link

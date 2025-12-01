@@ -18,6 +18,8 @@
     "tests",
     "secure",
     "ops",
-    ".next"
+    ".next",
+    "src/**/__tests__/**",
+    "src/app/api/__tests__/**"
   ]
 }

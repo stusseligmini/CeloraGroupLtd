@@ -178,6 +178,57 @@ async function handleBalanceCommand(
 }
 
 /**
+ * Handle /receive command: Show receive address with QR code
+ */
+async function handleReceiveCommand(
+  message: TelegramMessage
+): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { telegramId: String(message.from.id) },
+    include: {
+      wallets: {
+        where: { blockchain: 'solana', isDefault: true },
+        take: 1,
+      },
+    },
+  });
+
+  if (!user || user.wallets.length === 0) {
+    await sendTelegramMessage(
+      message.chatId,
+      '❌ No Solana wallet found. Please create a wallet first.',
+      { replyToMessageId: message.messageId }
+    );
+    return;
+  }
+
+  const wallet = user.wallets[0];
+  const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL || 'https://app.celora.com';
+
+  await sendTelegramMessage(
+    message.chatId,
+    `📥 <b>Receive SOL</b>\n\n` +
+      `<b>Your Address:</b>\n<code>${wallet.address}</code>\n\n` +
+      (user.username ? `<b>Username:</b> @${user.username}.sol\n\n` : '') +
+      `Tap the button below to view your QR code.`,
+    {
+      parseMode: 'HTML',
+      replyToMessageId: message.messageId,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            {
+              text: '📲 Show QR Code',
+              url: `${miniAppUrl}/wallet/receive?telegram_id=${message.from.id}`,
+            },
+          ],
+        ],
+      },
+    }
+  );
+}
+
+/**
  * Handle /wallet command: Show wallet info and open mini app
  */
 async function handleWalletCommand(
@@ -259,6 +310,7 @@ async function handleStartCommand(
       '/wallet - Open your wallet\n' +
       '/balance - Check your balance\n' +
       '/send - Send SOL to username or address\n' +
+      '/receive - Show your receive address\n' +
       '/help - Show this help message',
     {
       parseMode: 'HTML',
@@ -290,6 +342,7 @@ async function handleHelpCommand(
       '/balance - Check your SOL balance\n' +
       '/send @username 0.5 SOL - Send SOL to username\n' +
       '/send <address> 0.5 SOL - Send SOL to address\n' +
+      '/receive - Show your receive address & QR code\n' +
       '/help - Show this help\n\n' +
       '💡 <i>Tip: You can also use the wallet directly via the mini app button!</i>',
     {
@@ -399,6 +452,9 @@ export async function POST(request: NextRequest) {
               break;
             case 'send':
               await handleSendCommand(message, command.args);
+              break;
+            case 'receive':
+              await handleReceiveCommand(message);
               break;
             default:
               await sendTelegramMessage(

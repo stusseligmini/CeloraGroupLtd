@@ -6,30 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-interface Transaction {
-  signature: string;
-  timestamp: number;
-  type: 'deposit' | 'withdrawal' | 'win' | 'loss' | 'transfer' | 'unknown';
-  label: string;
-  amount: number;
-  counterparty?: string | null;
-  isCasinoTx: boolean;
-  fee: number;
-  source?: string;
-  nativeTransfers?: Array<{
-    from: string;
-    to: string;
-    amount: number;
-  }>;
-  tokenTransfers?: Array<{
-    from: string;
-    to: string;
-    amount: number;
-    mint: string;
-    symbol?: string;
-  }>;
-}
+import { getHeliusTransactionHistory, parseGamblingTransaction, type HeliusTransaction } from '@/lib/solana/heliusApi';
+import { TransactionHistoryItem } from '@/components/solana/TransactionHistoryItem';
 
 type FilterType = 'all' | 'deposits' | 'withdrawals' | 'wins' | 'casino';
 
@@ -38,8 +16,8 @@ export function TransactionHistory() {
   const searchParams = useSearchParams();
   const { user } = useAuthContext();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<HeliusTransaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<HeliusTransaction[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [expandedTx, setExpandedTx] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +28,7 @@ export function TransactionHistory() {
 
   // Get wallet address from URL or fetch from API
   useEffect(() => {
-    const address = searchParams.get('address');
+    const address = searchParams?.get('address') || undefined;
     if (address) {
       setWalletAddress(address);
     } else {
@@ -102,15 +80,7 @@ export function TransactionHistory() {
 
     try {
       setLoadingMore(true);
-      const beforeParam = before ? `&before=${before}` : '';
-      const response = await fetch(`/api/solana/history?address=${walletAddress}&limit=50${beforeParam}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch transaction history');
-      }
-
-      const data = await response.json();
-      const txs = data.data?.transactions || [];
+      const txs = await getHeliusTransactionHistory({ address: walletAddress, before, limit: 50, commitment: 'confirmed' });
 
       if (append) {
         setTransactions(prev => [...prev, ...txs]);
@@ -148,20 +118,22 @@ export function TransactionHistory() {
 
     switch (filter) {
       case 'deposits':
-        filtered = transactions.filter(tx => 
-          tx.type === 'deposit' || (tx.type === 'withdrawal' && tx.isCasinoTx)
-        );
+        filtered = transactions.filter(tx => {
+          const parsed = parseGamblingTransaction(tx, walletAddress!);
+          return parsed.type === 'deposit' || (parsed.type === 'withdrawal' && parsed.isCasinoTx);
+        });
         break;
       case 'withdrawals':
-        filtered = transactions.filter(tx => 
-          tx.type === 'withdrawal' && !tx.isCasinoTx
-        );
+        filtered = transactions.filter(tx => {
+          const parsed = parseGamblingTransaction(tx, walletAddress!);
+          return parsed.type === 'withdrawal' && !parsed.isCasinoTx;
+        });
         break;
       case 'wins':
-        filtered = transactions.filter(tx => tx.type === 'win');
+        filtered = transactions.filter(tx => parseGamblingTransaction(tx, walletAddress!).type === 'win');
         break;
       case 'casino':
-        filtered = transactions.filter(tx => tx.isCasinoTx);
+        filtered = transactions.filter(tx => parseGamblingTransaction(tx, walletAddress!).isCasinoTx);
         break;
       case 'all':
       default:
@@ -182,7 +154,8 @@ export function TransactionHistory() {
 
   // Format date
   const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
+    // Helius returns seconds; convert to ms
+    const date = new Date(timestamp * 1000);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const seconds = Math.floor(diff / 1000);
@@ -206,7 +179,7 @@ export function TransactionHistory() {
 
   // Format full date/time
   const formatFullDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('en-US', {
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -216,30 +189,7 @@ export function TransactionHistory() {
   };
 
   // Get transaction icon
-  const getTransactionIcon = (tx: Transaction) => {
-    if (tx.type === 'win') return '🎉';
-    if (tx.type === 'deposit' && tx.isCasinoTx) return '🎰';
-    if (tx.type === 'withdrawal' && tx.isCasinoTx) return '💸';
-    if (tx.type === 'deposit' || tx.type === 'transfer') return '↑';
-    return '↓';
-  };
-
-  // Get transaction color
-  const getTransactionColor = (tx: Transaction) => {
-    if (tx.type === 'win') return 'text-green-600';
-    if (tx.type === 'deposit' || tx.type === 'transfer') return 'text-blue-600';
-    if (tx.type === 'loss') return 'text-red-600';
-    return 'text-gray-600';
-  };
-
-  // Get transaction bg color
-  const getTransactionBgColor = (tx: Transaction) => {
-    if (tx.type === 'win') return 'bg-green-100';
-    if (tx.type === 'deposit' && tx.isCasinoTx) return 'bg-purple-100';
-    if (tx.type === 'deposit' || tx.type === 'transfer') return 'bg-blue-100';
-    if (tx.type === 'loss') return 'bg-red-100';
-    return 'bg-gray-100';
-  };
+  // Legacy icon/color helpers removed in favor of TransactionHistoryItem
 
   // Load more transactions
   const handleLoadMore = () => {
@@ -330,7 +280,7 @@ export function TransactionHistory() {
         </CardContent>
       </Card>
 
-      {/* Transactions List */}
+      {/* Transactions List (Helius enriched) */}
       <Card>
         <CardContent className="p-0">
           {filteredTransactions.length === 0 ? (
@@ -343,182 +293,15 @@ export function TransactionHistory() {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredTransactions.map((tx) => (
-                <div
-                  key={tx.signature}
-                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => setExpandedTx(expandedTx === tx.signature ? null : tx.signature)}
-                >
-                  <div className="flex items-center justify-between">
-                    {/* Left: Icon and Info */}
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${getTransactionBgColor(tx)}`}>
-                        {getTransactionIcon(tx)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-gray-900">{tx.label}</p>
-                          {tx.isCasinoTx && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-                              🎰 Casino
-                            </span>
-                          )}
-                          {tx.type === 'win' && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                              Win
-                            </span>
-                          )}
-                          {tx.type === 'loss' && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                              Loss
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <p className="text-sm text-gray-500">{formatDate(tx.timestamp)}</p>
-                          {tx.source && (
-                            <>
-                              <span className="text-gray-300">•</span>
-                              <p className="text-sm text-gray-500">{tx.source}</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Amount and Action */}
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className={`font-bold text-lg ${getTransactionColor(tx)}`}>
-                          {tx.type === 'deposit' || tx.type === 'win' || tx.type === 'transfer' ? '+' : '-'}
-                          {formatBalance(Math.abs(tx.amount))} SOL
-                        </p>
-                        <p className="text-xs text-gray-500">Fee: {formatBalance(tx.fee)} SOL</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openInSolscan(tx.signature);
-                        }}
-                      >
-                        View
-                      </Button>
-                    </div>
+            <div className="divide-y divide-slate-700">
+              {filteredTransactions.map((tx) => {
+                const parsed = parseGamblingTransaction(tx, walletAddress!);
+                return (
+                  <div key={tx.signature} className="p-4">
+                    <TransactionHistoryItem tx={tx} userAddress={walletAddress!} parsed={parsed} />
                   </div>
-
-                  {/* Expanded Details */}
-                  {expandedTx === tx.signature && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Date & Time</p>
-                          <p className="font-medium">{formatFullDate(tx.timestamp)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Transaction Fee</p>
-                          <p className="font-medium">{formatBalance(tx.fee)} SOL</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Signature</p>
-                          <div className="flex items-center gap-2">
-                            <p className="font-mono text-xs break-all">{tx.signature.slice(0, 20)}...</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyAddress(tx.signature);
-                              }}
-                            >
-                              Copy
-                            </Button>
-                          </div>
-                        </div>
-                        {tx.counterparty && (
-                          <div>
-                            <p className="text-gray-500">Counterparty</p>
-                            <div className="flex items-center gap-2">
-                              <p className="font-mono text-xs break-all">
-                                {tx.counterparty.slice(0, 8)}...{tx.counterparty.slice(-8)}
-                              </p>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyAddress(tx.counterparty!);
-                                }}
-                              >
-                                Copy
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {tx.nativeTransfers && tx.nativeTransfers.length > 0 && (
-                        <div>
-                          <p className="text-gray-500 text-sm mb-2">Native Transfers</p>
-                          <div className="space-y-2">
-                            {tx.nativeTransfers.map((transfer, idx) => (
-                              <div key={idx} className="bg-gray-50 p-2 rounded text-xs">
-                                <p className="font-mono">{formatBalance(transfer.amount)} SOL</p>
-                                <p className="text-gray-500">
-                                  {transfer.from.slice(0, 8)}... → {transfer.to.slice(0, 8)}...
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {tx.tokenTransfers && tx.tokenTransfers.length > 0 && (
-                        <div>
-                          <p className="text-gray-500 text-sm mb-2">Token Transfers</p>
-                          <div className="space-y-2">
-                            {tx.tokenTransfers.map((transfer, idx) => (
-                              <div key={idx} className="bg-gray-50 p-2 rounded text-xs">
-                                <p className="font-medium">
-                                  {transfer.symbol || 'Unknown'}: {transfer.amount}
-                                </p>
-                                <p className="text-gray-500 font-mono text-xs">
-                                  {transfer.mint.slice(0, 8)}...
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openInSolscan(tx.signature);
-                          }}
-                        >
-                          View on Solscan
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyAddress(tx.signature);
-                          }}
-                        >
-                          Copy Signature
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

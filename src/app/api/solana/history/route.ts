@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getHeliusTransactionHistory, parseGamblingTransaction } from '@/lib/solana/heliusApi';
 import { errorResponse, successResponse } from '@/lib/validation/validate';
 
+const allowedOrigins = new Set(
+  [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_EXTENSION_ORIGIN]
+    .filter((value): value is string => Boolean(value))
+);
+
+function withCors(response: NextResponse, request: NextRequest): NextResponse {
+  const origin = request.headers.get('origin');
+  
+  if (origin && allowedOrigins.has(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.set('Vary', 'Origin');
+  } else if (allowedOrigins.size === 0) {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+  }
+
+  response.headers.set('Access-Control-Allow-Headers', 'authorization, content-type, x-user-id');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+  return response;
+}
+
+export async function OPTIONS(request: NextRequest) {
+  const response = new NextResponse(null, { status: 204 });
+  return withCors(response, request);
+}
+
 /**
  * GET /api/solana/history - Get enriched transaction history from Helius
  * 
@@ -69,16 +95,17 @@ export async function GET(request: NextRequest) {
       count: parsedTransactions.length,
     }, 200, requestId);
 
-    return response;
+    return withCors(response, request);
   } catch (error) {
     console.error('Error fetching Solana transaction history', error);
-    return errorResponse(
+    const errorResp = errorResponse(
       'INTERNAL_SERVER_ERROR',
       'Failed to fetch transaction history',
       500,
       process.env.NODE_ENV === 'development' ? error : undefined,
       requestId
     );
+    return withCors(errorResp, request);
   }
 }
 

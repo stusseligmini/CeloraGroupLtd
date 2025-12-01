@@ -92,7 +92,7 @@ export default function SignUpPage() {
 
           <div className="text-sm text-gray-400 flex items-center justify-between">
             <span>Har du allerede konto?</span>
-            <Link href="/signin" className="text-cyan-300 hover:text-cyan-200 font-medium">
+            <Link href="/splash" className="text-cyan-300 hover:text-cyan-200 font-medium">
               Logg inn
             </Link>
           </div>

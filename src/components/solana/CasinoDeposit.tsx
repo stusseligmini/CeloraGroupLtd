@@ -12,13 +12,13 @@ import {
   getPresetsByCategory,
   searchPresets,
   type CasinoPreset 
-} from '@/lib/solana/casinoPresets';
+} from '@/lib/casino';
 import { 
   getWalletFromLocal, 
   WalletEncryption 
 } from '@/lib/wallet/nonCustodialWallet';
-import { deriveSolanaWallet, getSolanaConnection } from '@/lib/solana/solanaWallet';
-import { estimatePriorityFee } from '@/lib/solana/priorityFees';
+import { deriveSolanaWallet, getSolanaConnection, estimatePriorityFeeMicroLamports } from '@/lib/solana/solanaWallet';
+import { envFlags } from '@/lib/env/flags';
 import { Transaction, SystemProgram, LAMPORTS_PER_SOL, PublicKey, ComputeBudgetProgram } from '@solana/web3.js';
 
 interface SolanaWallet {
@@ -56,6 +56,7 @@ export function CasinoDeposit() {
   // Fetch SOL price
   const fetchSolPrice = useCallback(async () => {
     try {
+      if (envFlags.disablePrices) { setSolPrice(150); return; }
       const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
       if (response.ok) {
         const data = await response.json();
@@ -167,7 +168,7 @@ export function CasinoDeposit() {
       return customAddress;
     }
     if (selectedCasino) {
-      return selectedCasino.address;
+      return (selectedCasino as any).address || '';
     }
     return null;
   };
@@ -242,16 +243,12 @@ export function CasinoDeposit() {
       // Build transaction with instant priority fee (gambling)
       const connection = getSolanaConnection();
       const { blockhash } = await connection.getLatestBlockhash('confirmed');
-      const priorityFee = await estimatePriorityFee(connection, 'instant');
+      const priorityMicro = await estimatePriorityFeeMicroLamports(connection);
 
       const transaction = new Transaction();
       
       // Add priority fee first (for instant confirmation)
-      transaction.add(
-        ComputeBudgetProgram.setComputeUnitPrice({
-          microLamports: priorityFee.unitPrice,
-        })
-      );
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityMicro }));
 
       // Add transfer
       transaction.add(

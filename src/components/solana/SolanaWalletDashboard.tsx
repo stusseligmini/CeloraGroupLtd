@@ -122,6 +122,7 @@ export function SolanaWalletDashboard() {
     } catch (err: any) {
       console.error('Failed to fetch wallet', err);
       setError(err.message || 'Failed to load wallet');
+    } finally {
       setLoading(false);
     }
   }, [user]);
@@ -147,9 +148,7 @@ export function SolanaWalletDashboard() {
       setError(null);
       setRetryCount(0);
       
-      if (wallet) {
-        setWallet(prev => prev ? { ...prev, balance: solBalance, balanceUSD: usdBalance } : null);
-      }
+      setWallet(prev => prev ? { ...prev, balance: solBalance, balanceUSD: usdBalance } : null);
 
       // Subscribe to real-time balance updates
       if (unsubscribeRef.current) {
@@ -157,11 +156,11 @@ export function SolanaWalletDashboard() {
       }
 
       unsubscribeRef.current = subscribeToBalance(address, (newBalance) => {
+        const currentPrice = solPrice || 150;
+        const newUsdBalance = newBalance * currentPrice;
         setBalance(newBalance);
-        setBalanceUSD(newBalance * (solPrice || 150));
-        if (wallet) {
-          setWallet(prev => prev ? { ...prev, balance: newBalance, balanceUSD: newBalance * (solPrice || 150) } : null);
-        }
+        setBalanceUSD(newUsdBalance);
+        setWallet(prev => prev ? { ...prev, balance: newBalance, balanceUSD: newUsdBalance } : null);
       });
 
     } catch (err: any) {
@@ -178,7 +177,7 @@ export function SolanaWalletDashboard() {
     } finally {
       setLoadingBalance(false);
     }
-  }, [solPrice, wallet, retryCount]);
+  }, [solPrice]);
 
   // Fetch transaction history
   const fetchTransactions = useCallback(async (address: string, retry = false) => {
@@ -245,11 +244,11 @@ export function SolanaWalletDashboard() {
 
   // Refresh balance when SOL price changes
   useEffect(() => {
-    if (wallet && balance > 0) {
+    if (balance > 0) {
       setBalanceUSD(balance * solPrice);
       setWallet(prev => prev ? { ...prev, balanceUSD: balance * solPrice } : null);
     }
-  }, [solPrice, balance, wallet]);
+  }, [solPrice, balance]);
 
   // Format balance
   const formatBalance = (bal: number) => {

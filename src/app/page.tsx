@@ -23,9 +23,8 @@ export default function HomePage() {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    // Redirect to signin if not authenticated
     if (!isLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, isLoading, router]);
 
@@ -45,7 +44,7 @@ export default function HomePage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
+          <h1 className="text-3xl font-bold heading-gradient mb-2">Dashboard</h1>
           <p className="text-gray-400">Welcome back to Celora</p>
         </div>
 

@@ -162,8 +162,8 @@ export const RateLimitPresets = {
   
   // Authentication endpoints (stricter)
   auth: {
-    limit: 10,
-    windowMs: 60 * 1000, // 10 requests per minute
+    limit: process.env.NODE_ENV === 'development' ? 100 : 10,
+    windowMs: 60 * 1000, // 100 requests per minute (dev), 10 (prod)
   },
   
   // Write operations (POST, PUT, DELETE)

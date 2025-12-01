@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { useNotifications } from '@/hooks/useNotifications';
 
 interface NotificationPanelProps {
@@ -14,21 +15,21 @@ export function NotificationPanel({ title = 'Security notifications', limit = 5,
   const list = notifications.slice(0, limit);
 
   return (
-    <section className="cel-card">
-      <header className="cel-card__header">
+    <Card>
+      <CardHeader>
         <div>
           <p className="cel-eyebrow">Alerts</p>
           <h2 className="cel-title">{title}</h2>
         </div>
         <div className="cel-card__actions">
           {unreadCount > 0 ? <span className="cel-badge">{unreadCount} new</span> : null}
-          <button type="button" className="cel-button cel-button--ghost" onClick={refresh} disabled={loading}>
+          <button type="button" className="cel-button cel-button--ghost ring-glow" onClick={refresh} disabled={loading}>
             Refresh
           </button>
         </div>
-      </header>
+      </CardHeader>
 
-      <div className="cel-card__content cel-card__content--tight">
+      <CardContent className="cel-card__content--tight">
         {loading && list.length === 0 ? <p className="cel-body">Loading notifications…</p> : null}
         {error ? (
           <p className="cel-error" role="alert">
@@ -58,16 +59,16 @@ export function NotificationPanel({ title = 'Security notifications', limit = 5,
             ))}
           </ul>
         )}
-      </div>
+      </CardContent>
 
       {showFooter ? (
-        <footer className="cel-card__footer">
+        <CardFooter>
           <span className="cel-link" role="link">
             View notification settings
           </span>
-        </footer>
+        </CardFooter>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

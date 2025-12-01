@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 
 interface CasinoPreset {
   id: string;
@@ -91,19 +92,13 @@ export default function CasinoDepositPage() {
 
   const fetchWallets = async () => {
     try {
-      const response = await fetch('/api/wallet/list?blockchain=solana', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const solanaWallets = (data.wallets || []).filter(
-          (w: Wallet) => w.blockchain.toLowerCase() === 'solana'
-        );
-        setWallets(solanaWallets);
-        if (solanaWallets.length > 0) {
-          setSelectedWallet(solanaWallets[0].id);
-        }
+      const data = await api.get<{ wallets: Wallet[] }>('/wallet/list?blockchain=solana');
+      const solanaWallets = (data.wallets || []).filter(
+        (w: Wallet) => w.blockchain.toLowerCase() === 'solana'
+      );
+      setWallets(solanaWallets);
+      if (solanaWallets.length > 0) {
+        setSelectedWallet(solanaWallets[0].id);
       }
     } catch (err) {
       console.error('Error fetching wallets:', err);
@@ -112,14 +107,8 @@ export default function CasinoDepositPage() {
 
   const fetchRecentDeposits = async () => {
     try {
-      const response = await fetch('/api/solana/history?type=casino', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRecentDeposits(data.transactions?.slice(0, 5) || []);
-      }
+      const data = await api.get<{ transactions?: RecentDeposit[] }>('/solana/history?type=casino');
+      setRecentDeposits(data.transactions?.slice(0, 5) || []);
     } catch (err) {
       console.error('Error fetching deposits:', err);
     }

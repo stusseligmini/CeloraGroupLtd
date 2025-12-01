@@ -89,7 +89,7 @@ export default function UpdatePasswordPage() {
         </form>
 
         <div className="text-sm text-gray-400 flex items-center justify-between">
-          <Link href="/signin" className="text-cyan-300 hover:text-cyan-200 font-medium">
+          <Link href="/splash" className="text-cyan-300 hover:text-cyan-200 font-medium">
             Tilbake til innlogging
           </Link>
           <Link href="/signup" className="text-cyan-300 hover:text-cyan-200 font-medium">

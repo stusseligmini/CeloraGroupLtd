@@ -20,9 +20,11 @@ import { Keypair } from '@solana/web3.js';
 import * as ethers from 'ethers';
 import * as bitcoin from 'bitcoinjs-lib';
 import { ECPairFactory } from 'ecpair';
+import { BIP32Factory } from 'bip32';
 import * as ecc from 'tiny-secp256k1';
 
 const ECPair = ECPairFactory(ecc);
+const bip32 = BIP32Factory(ecc);
 
 // Derivation paths for different blockchains
 export const DERIVATION_PATHS = {
@@ -76,16 +78,16 @@ export function deriveSolanaKeypair(mnemonic: string, accountIndex: number = 0):
 /**
  * Derive keypair for Ethereum/Celo from seed phrase
  */
-export function deriveEthereumWallet(
+export function deriveEthereumKeypair(
   mnemonic: string,
   blockchain: 'ethereum' | 'celo' = 'ethereum',
   accountIndex: number = 0
-): ethers.Wallet {
+): ethers.HDNodeWallet {
   const path = blockchain === 'celo' 
     ? `m/44'/52752'/0'/0/${accountIndex}`
     : `m/44'/60'/0'/0/${accountIndex}`;
   
-  return ethers.Wallet.fromPhrase(mnemonic, path);
+  return ethers.HDNodeWallet.fromPhrase(mnemonic, path);
 }
 
 /**
@@ -96,7 +98,7 @@ export function deriveBitcoinKeypair(
   accountIndex: number = 0
 ): { privateKey: Buffer; publicKey: Buffer; address: string } {
   const seed = mnemonicToSeedSync(mnemonic);
-  const root = bitcoin.bip32.fromSeed(seed);
+  const root = bip32.fromSeed(seed);
   const path = `m/44'/0'/0'/0/${accountIndex}`;
   const child = root.derivePath(path);
   
@@ -106,7 +108,7 @@ export function deriveBitcoinKeypair(
   
   const keyPair = ECPair.fromPrivateKey(child.privateKey);
   const { address } = bitcoin.payments.p2pkh({
-    pubkey: keyPair.publicKey,
+    pubkey: Buffer.from(keyPair.publicKey),
     network: bitcoin.networks.bitcoin,
   });
   
@@ -115,8 +117,8 @@ export function deriveBitcoinKeypair(
   }
   
   return {
-    privateKey: child.privateKey,
-    publicKey: keyPair.publicKey,
+    privateKey: Buffer.from(child.privateKey),
+    publicKey: Buffer.from(keyPair.publicKey),
     address,
   };
 }
@@ -279,9 +281,9 @@ export function deriveAllAddresses(mnemonic: string): {
   celo: string;
 } {
   const solanaKeypair = deriveSolanaKeypair(mnemonic);
-  const ethereumWallet = deriveEthereumWallet(mnemonic, 'ethereum');
+  const ethereumWallet = deriveEthereumKeypair(mnemonic, 'ethereum');
   const bitcoinKeypair = deriveBitcoinKeypair(mnemonic);
-  const celoWallet = deriveEthereumWallet(mnemonic, 'celo');
+  const celoWallet = deriveEthereumKeypair(mnemonic, 'celo');
 
   return {
     solana: solanaKeypair.publicKey.toBase58(),

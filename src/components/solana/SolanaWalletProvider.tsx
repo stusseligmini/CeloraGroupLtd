@@ -25,10 +25,18 @@ interface SolanaWalletProviderProps {
 }
 
 export function SolanaWalletProvider({ children }: SolanaWalletProviderProps) {
-  // Use mainnet for production, devnet for development
-  const network = WalletAdapterNetwork.Mainnet;
+  // Use devnet for development/testing, mainnet for production
+  const network = process.env.NODE_ENV === 'development' 
+    ? WalletAdapterNetwork.Devnet 
+    : WalletAdapterNetwork.Mainnet;
+  
   const endpoint = useMemo(() => {
-    // Use Helius RPC if available, otherwise fallback to public RPC
+    // Use Helius devnet for testing with WebSocket support
+    if (process.env.NODE_ENV === 'development') {
+      return process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 
+        'https://devnet.helius-rpc.com/?api-key=' + (process.env.NEXT_PUBLIC_HELIUS_API_KEY || '');
+    }
+    // Production: Use mainnet Helius
     return (
       process.env.NEXT_PUBLIC_HELIUS_RPC_URL ||
       process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||

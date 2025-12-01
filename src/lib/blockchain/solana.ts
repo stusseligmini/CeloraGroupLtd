@@ -36,14 +36,25 @@ export class SolanaClient {
 
   private initializeConnections(): void {
     try {
-      this.connection = new Connection(this.config.primary, 'confirmed');
+      // Get WebSocket URL from env (Helius devnet)
+      const wsEndpoint = process.env.SOLANA_WSS_URL || 
+        'wss://devnet.helius-rpc.com/?api-key=' + (process.env.NEXT_PUBLIC_HELIUS_API_KEY || '');
+      
+      this.connection = new Connection(this.config.primary, {
+        commitment: 'confirmed',
+        wsEndpoint: wsEndpoint,
+      });
       
       this.fallbackConnections = this.config.fallbacks.map(
-        url => new Connection(url, 'confirmed')
+        url => new Connection(url, {
+          commitment: 'confirmed',
+          wsEndpoint: wsEndpoint,
+        })
       );
       
-      logger.info('Solana RPC connections initialized', {
+      logger.info('Solana RPC connections initialized with WebSocket', {
         primary: this.config.primary,
+        wsEndpoint: wsEndpoint,
         fallbacks: this.config.fallbacks.length,
       });
     } catch (error) {
@@ -224,15 +235,15 @@ export class SolanaClient {
   }
 }
 
-// Mainnet configuration
-const SOLANA_MAINNET_CONFIG: SolanaRPCConfig = {
-  primary: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+// Devnet configuration (for testing with Helius)
+const SOLANA_DEVNET_CONFIG: SolanaRPCConfig = {
+  primary: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 
+    'https://devnet.helius-rpc.com/?api-key=' + (process.env.NEXT_PUBLIC_HELIUS_API_KEY || ''),
   fallbacks: [
-    'https://solana-api.projectserum.com',
-    'https://rpc.ankr.com/solana',
+    'https://api.devnet.solana.com',
   ],
 };
 
-export const solanaClient = new SolanaClient(SOLANA_MAINNET_CONFIG);
+export const solanaClient = new SolanaClient(SOLANA_DEVNET_CONFIG);
 
 

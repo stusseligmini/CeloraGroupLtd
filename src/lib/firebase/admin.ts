@@ -27,10 +27,13 @@ export function getFirebaseAdmin(): { app: App; auth: Auth } {
   }
 
   // Initialize with service account or use default credentials
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  // Prefer explicit service account object or decomposed env vars
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT; // JSON string if provided
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
   
-  let adminConfig: any = {
+  const adminConfig: any = {
     projectId,
   };
 
@@ -51,17 +54,33 @@ export function getFirebaseAdmin(): { app: App; auth: Auth } {
         console.warn('[Firebase Admin] Failed to load service account, trying default credentials:', error);
       }
     }
+  } else if (clientEmail && privateKeyRaw && projectId) {
+    // Normalize escaped newlines
+    const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
+    try {
+      adminConfig.credential = cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      });
+    } catch (e) {
+      console.error('[Firebase Admin] Failed to build credential from env vars:', e);
+    }
   } else {
-    // No service account provided - use default credentials (for Firebase emulator or local dev)
-    console.warn('[Firebase Admin] FIREBASE_SERVICE_ACCOUNT not set, using default credentials');
+    console.warn('[Firebase Admin] No service account JSON or decomposed key env vars found; falling back to default credentials');
   }
 
-  if (!projectId && !serviceAccount) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT or NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is required');
+  if (!projectId) {
+    throw new Error('FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID) is required for Firebase Admin initialization');
   }
 
   adminApp = initializeApp(adminConfig);
   adminAuth = getAuth(adminApp);
+
+  console.info('[Firebase Admin] Initialized', {
+    projectId,
+    credentialType: adminConfig.credential ? 'service-account' : 'default',
+  });
 
   return { app: adminApp, auth: adminAuth };
 }

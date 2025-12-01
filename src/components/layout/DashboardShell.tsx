@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { CeloraLogo } from '@/components/ui/CeloraLogo';
 
 interface NavItem {
   name: string;
@@ -101,11 +102,11 @@ export function DashboardShell({ children }: DashboardShellProps) {
     if (href === '/') {
       return pathname === href;
     }
-    return pathname.startsWith(href);
+    return (pathname || '').startsWith(href);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0e17] via-[#1a1f2e] to-[#0a0e17]">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a0e17] via-[#131a29] to-[#0a0e17] vignette noise-overlay">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -126,12 +127,22 @@ export function DashboardShell({ children }: DashboardShellProps) {
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-6 py-6 border-b border-cyan-primary/20">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-glow to-cyan-primary flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">C</span>
+        <div className="relative px-6 py-6 border-b border-cyan-primary/20 h-28">
+          <Link href="/" className="flex items-center justify-between h-full">
+            <div className="w-20 h-20">
+              <img
+                src="/images/celora-lock.png"
+                alt="Celora Lock"
+                className="w-full h-full object-contain filter drop-shadow-[0_0_16px_rgba(10,245,211,.35)] hover:drop-shadow-[0_0_24px_rgba(10,245,211,.45)] transition-all"
+              />
             </div>
-            <span className="logo-text text-2xl font-bold">CELORA</span>
+            <div className="w-32 h-auto">
+              <img
+                src="/images/celora-wordmark.png"
+                alt="Celora"
+                className="w-full h-auto object-contain brightness-115 contrast-110 opacity-90"
+              />
+            </div>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -152,13 +163,10 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 key={item.name}
                 href={item.href}
                 className={`
-                  flex items-center gap-3 px-3 py-3 rounded-lg
-                  transition-all duration-200
-                  ${
-                    active
-                      ? 'bg-cyan-primary/20 text-cyan-primary border border-cyan-primary/30 shadow-neon-sm'
-                      : 'text-gray-400 hover:text-white hover:bg-dark-card/50'
-                  }
+                  flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 cursor-pointer
+                  ${active
+                    ? 'bg-cyan-primary/10 text-cyan-primary ring-1 ring-cyan-primary/30 ring-offset-0'
+                    : 'text-gray-400 hover:text-white hover:bg-dark-card/40 hover:ring-1 hover:ring-cyan-primary/20'}
                 `}
                 onClick={() => setSidebarOpen(false)}
               >
@@ -198,7 +206,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             </div>
           ) : (
             <Link
-              href="/signin"
+              href="/splash"
               className="block w-full px-4 py-2 text-sm font-medium text-center text-white bg-cyan-primary/20 border border-cyan-primary/30 rounded-lg hover:bg-cyan-primary/30 transition-colors"
             >
               Sign In
@@ -220,11 +228,15 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-glow to-cyan-primary flex items-center justify-center">
-                <span className="text-lg font-bold text-white">C</span>
-              </div>
-              <span className="logo-text text-xl font-bold">CELORA</span>
+            <Link href="/">
+              <CeloraLogo
+                size="sm"
+                layout="stack"
+                className="filter drop-shadow-[0_0_10px_rgba(10,245,211,.3)]"
+                src="/images/celora-lock.png"
+                wordmarkSrc="/images/celora-wordmark.png"
+                wordmarkClassName="brightness-110"
+              />
             </Link>
             <div className="w-6"></div> {/* Spacer for centering */}
           </div>

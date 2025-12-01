@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 
 interface SecuritySettings {
   twoFactorEnabled: boolean;
@@ -25,7 +26,7 @@ export default function SecuritySettingsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -37,14 +38,8 @@ export default function SecuritySettingsPage() {
 
   const fetchSecuritySettings = async () => {
     try {
-      const response = await fetch('/api/user/security', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data.settings);
-      }
+      const data = await api.get<{ settings: SecuritySettings }>('/user/security');
+      setSettings(data.settings);
     } catch (err) {
       console.error('Error fetching security settings:', err);
     }
@@ -64,22 +59,10 @@ export default function SecuritySettingsPage() {
         throw new Error('Password must be at least 8 characters');
       }
 
-      const response = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
+      await api.post('/user/change-password', {
+        currentPassword,
+        newPassword,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to change password');
-      }
 
       setSuccess('Password changed successfully');
       setCurrentPassword('');
@@ -100,17 +83,7 @@ export default function SecuritySettingsPage() {
       setError(null);
       setSuccess(null);
 
-      const response = await fetch('/api/user/2fa/toggle', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to toggle 2FA');
-      }
-
-      const data = await response.json();
+      const data = await api.post<{ settings: SecuritySettings }>('/user/2fa/toggle', {});
       setSettings(data.settings);
       setSuccess(data.settings.twoFactorEnabled ? '2FA enabled' : '2FA disabled');
     } catch (err: any) {
@@ -131,15 +104,7 @@ export default function SecuritySettingsPage() {
       setError(null);
       setSuccess(null);
 
-      const response = await fetch('/api/user/sessions/terminate-all', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to terminate sessions');
-      }
+      await api.post('/user/sessions/terminate-all', {});
 
       setSuccess('All other sessions terminated');
       fetchSecuritySettings();

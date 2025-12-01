@@ -83,7 +83,7 @@ export default function ResetPasswordPage() {
           </form>
 
           <div className="flex items-center justify-between text-sm text-gray-400">
-            <Link href="/signin" className="text-cyan-300 hover:text-cyan-200">
+            <Link href="/splash" className="text-cyan-300 hover:text-cyan-200">
               Tilbake til innlogging
             </Link>
             <Link href="/signup" className="text-cyan-300 hover:text-cyan-200">

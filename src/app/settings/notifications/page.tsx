@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 
 interface NotificationSettings {
   emailNotifications: {
@@ -37,7 +38,7 @@ export default function NotificationSettingsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -49,14 +50,8 @@ export default function NotificationSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/user/notifications', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data.settings);
-      }
+      const data = await api.get<{ settings: NotificationSettings }>('/user/notifications');
+      setSettings(data.settings);
     } catch (err) {
       console.error('Error fetching notification settings:', err);
     }
@@ -68,20 +63,7 @@ export default function NotificationSettingsPage() {
       setError(null);
       setSuccess(null);
 
-      const response = await fetch('/api/user/notifications', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(settings),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update settings');
-      }
-
+      await api.patch('/user/notifications', settings);
       setSuccess('Notification settings updated successfully');
     } catch (err: any) {
       console.error('Error updating settings:', err);

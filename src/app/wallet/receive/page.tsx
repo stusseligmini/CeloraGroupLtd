@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 import QRCode from 'qrcode';
 
 interface Wallet {
@@ -27,7 +28,7 @@ export default function ReceivePage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -45,16 +46,10 @@ export default function ReceivePage() {
 
   const fetchWallets = async () => {
     try {
-      const response = await fetch('/api/wallet/list', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setWallets(data.wallets || []);
-        if (data.wallets?.length > 0) {
-          setSelectedWallet(data.wallets[0].id);
-        }
+      const data = await api.get<{ wallets: Wallet[] }>('/wallet/list');
+      setWallets(data.wallets || []);
+      if (data.wallets?.length > 0) {
+        setSelectedWallet(data.wallets[0].id);
       }
     } catch (err) {
       console.error('Error fetching wallets:', err);

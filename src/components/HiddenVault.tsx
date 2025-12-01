@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { logger } from '@/lib/logger';
+import api from '@/lib/apiClient';
 
 interface HiddenVaultProps {
   walletId: string;
@@ -37,14 +38,12 @@ export function HiddenVault({ walletId, onUnlocked }: HiddenVaultProps) {
 
   const loadVaultStatus = async () => {
     try {
-      const response = await fetch(`/api/wallet/vault?walletId=${walletId}`, {
-        credentials: 'include', // Include cookies for authentication
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setVaultStatus(data.data);
-        setMode(data.data.hasPinSet ? 'unlock' : 'setup');
+      const data = await api.get<{ isHidden: boolean; vaultLevel: number; hasPinSet: boolean }>(
+        `/wallet/vault?walletId=${walletId}`
+      );
+      if (data) {
+        setVaultStatus(data);
+        setMode(data.hasPinSet ? 'unlock' : 'setup');
       }
     } catch (err) {
       logger.error('Failed to load vault status', err instanceof Error ? err : undefined, { walletId });
@@ -74,28 +73,18 @@ export function HiddenVault({ walletId, onUnlocked }: HiddenVaultProps) {
     try {
       setLoading(true);
 
-      const response = await fetch('/api/wallet/vault/set-pin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for authentication
-        body: JSON.stringify({
-          walletId,
-          pin,
-          confirmPin,
-        }),
-      });
+      const data = await api.post<{ success?: boolean }>(
+        '/wallet/vault/set-pin',
+        { walletId, pin, confirmPin }
+      );
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (data) {
         setPin('');
         setConfirmPin('');
         setMode('unlock');
         await loadVaultStatus();
       } else {
-        setError(data.error || 'Failed to set PIN');
+        setError('Failed to set PIN');
       }
     } catch (err) {
       setError('Failed to set PIN. Please try again.');
@@ -115,26 +104,17 @@ export function HiddenVault({ walletId, onUnlocked }: HiddenVaultProps) {
     try {
       setLoading(true);
 
-      const response = await fetch('/api/wallet/vault/unlock', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for authentication
-        body: JSON.stringify({
-          walletId,
-          pin,
-        }),
-      });
+      const data = await api.put<{ token: string | undefined }>(
+        '/wallet/vault/unlock',
+        { walletId, pin }
+      );
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (data) {
         setIsUnlocked(true);
         setPin('');
         
-        if (onUnlocked && data.data.token) {
-          onUnlocked(data.data.token);
+        if (onUnlocked && (data as any).token) {
+          onUnlocked((data as any).token);
         }
 
         // Auto-lock after 5 minutes
@@ -142,7 +122,7 @@ export function HiddenVault({ walletId, onUnlocked }: HiddenVaultProps) {
           setIsUnlocked(false);
         }, 5 * 60 * 1000);
       } else {
-        setError(data.error || 'Incorrect PIN');
+        setError((data as any).error || 'Incorrect PIN');
       }
     } catch (err) {
       setError('Failed to unlock vault. Please try again.');

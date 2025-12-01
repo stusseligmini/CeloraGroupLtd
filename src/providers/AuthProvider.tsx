@@ -74,6 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) {
       setSession(null);
       setApiAuthToken(null);
+      // Clear cookie
+      if (typeof document !== 'undefined') {
+        document.cookie = 'firebase-id-token=; Max-Age=0; path=/';
+      }
       return;
     }
 
@@ -84,24 +88,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setSession({ accessToken: token, expiresAt });
       setApiAuthToken(token);
+      // Persist token in cookie for server-side auth (short-lived)
+      if (typeof document !== 'undefined') {
+        const secure = window.location.protocol === 'https:';
+        const maxAge = 60 * 60; // 1 hour
+        document.cookie = `firebase-id-token=${token}; Path=/; Max-Age=${maxAge}; SameSite=Lax; ${secure ? 'Secure; ' : ''}`;
+      }
     } catch (err) {
       console.error('[Auth] Failed to get Firebase token:', err);
       setSession(null);
       setApiAuthToken(null);
+      if (typeof document !== 'undefined') {
+        document.cookie = 'firebase-id-token=; Max-Age=0; path=/';
+      }
     }
   }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const normalized = normalizeFirebaseUser(firebaseUser);
-        setUser(normalized);
-        await setSessionFromFirebase(firebaseUser);
-      } else {
-        setUser(null);
-        setSession(null);
-        setApiAuthToken(null);
+      try {
+        if (firebaseUser) {
+          const normalized = normalizeFirebaseUser(firebaseUser);
+          setUser(normalized);
+          await setSessionFromFirebase(firebaseUser);
+        } else {
+          setUser(null);
+          setSession(null);
+          setApiAuthToken(null);
+        }
+      } catch (err) {
+        console.error('[Auth] Error in auth state change:', err);
+        setError(err instanceof Error ? err : new Error('Auth state change failed'));
+      } finally {
+        setLoading(false);
       }
+    }, (error) => {
+      // Handle auth state change errors
+      console.error('[Auth] Auth state observer error:', error);
+      setError(error);
       setLoading(false);
     });
 
@@ -114,7 +138,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signInAnonymously(auth);
       return {};
     } catch (err) {
+      console.error('[Auth] Sign in failed:', err);
       const failure = err instanceof Error ? err : new Error('Failed to sign in');
+      
+      // Check if it's a network error
+      if (err && typeof err === 'object' && 'code' in err) {
+        const firebaseError = err as { code: string; message: string };
+        if (firebaseError.code === 'auth/network-request-failed') {
+          const networkError = new Error('Network error: Unable to connect to Firebase. Please check your internet connection or try again later.');
+          setError(networkError);
+          return { error: networkError };
+        }
+      }
+      
       setError(failure);
       return { error: failure };
     }

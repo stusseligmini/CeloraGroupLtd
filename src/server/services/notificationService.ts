@@ -25,17 +25,17 @@ function getFallbackNotifications(): NotificationItem[] {
   const now = Date.now();
   return [
     {
-      id: 'azure-welcome',
-      title: 'Welcome to Celora on Azure',
-      body: 'Your account is active. The Azure extension keeps you updated wherever you browse.',
+      id: 'welcome',
+      title: 'Welcome to Celora',
+      body: 'Your account is active and ready to use.',
       createdAt: new Date(now).toISOString(),
       read: false,
       severity: 'info',
     },
     {
       id: 'security-posture',
-      title: 'Security posture stable',
-      body: 'Key Vault and Redis cache rotations completed automatically.',
+      title: 'Security systems active',
+      body: 'All security checks passed. Your account is fully protected.',
       createdAt: new Date(now - 1000 * 60 * 30).toISOString(),
       read: true,
       severity: 'info',

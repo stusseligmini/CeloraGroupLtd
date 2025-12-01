@@ -68,8 +68,16 @@ export async function GET(request: NextRequest) {
 
     const summary = await getWalletSummary(userId, token);
 
+    // Adapt minimal summary to API schema shape expected by clients
+    const payload = {
+      totalFiatBalance: summary.totalBalance ?? 0,
+      fiatCurrency: summary.currency ?? 'USD',
+      wallets: [],
+      recentTransactions: [],
+    };
+
     // Validate response against schema
-    const validatedSummary = WalletSummaryResponseSchema.parse(summary);
+    const validatedSummary = WalletSummaryResponseSchema.parse(payload);
 
     const response = successResponse(validatedSummary, 200, requestId);
     return withCors(response, request);

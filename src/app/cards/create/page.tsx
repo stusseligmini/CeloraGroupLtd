@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/apiClient';
 
 interface Wallet {
   id: string;
@@ -93,15 +94,9 @@ export default function CreateCardPage() {
 
   const fetchWallets = async () => {
     try {
-      const response = await fetch('/api/wallet/list', {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch wallets');
-      }
-
-      const data = await response.json();
+      const data = await api.get<{ wallets: Wallet[] }>(
+        '/wallet/list'
+      );
       setWallets(data.wallets || []);
     } catch (err) {
       console.error('Error fetching wallets:', err);
@@ -125,22 +120,10 @@ export default function CreateCardPage() {
     try {
       setIsLoading(true);
       setError(null);
-
-      const response = await fetch('/api/cards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create card');
-      }
-
-      const data = await response.json();
+      const data = await api.post<{ card: { id: string } }>(
+        '/cards',
+        formData
+      );
       router.push(`/cards/${data.card.id}`);
     } catch (err: any) {
       console.error('Error creating card:', err);

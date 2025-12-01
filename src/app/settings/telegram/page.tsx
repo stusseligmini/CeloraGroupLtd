@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/apiClient';
 
 interface TelegramStatus {
   isLinked: boolean;
@@ -23,7 +24,7 @@ export default function TelegramSettingsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/signin');
+      router.push('/splash');
     }
   }, [user, authLoading, router]);
 
@@ -35,14 +36,8 @@ export default function TelegramSettingsPage() {
 
   const fetchTelegramStatus = async () => {
     try {
-      const response = await fetch('/api/user/telegram/status', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setStatus(data.status);
-      }
+      const data = await api.get<{ status: TelegramStatus }>('/user/telegram/status');
+      setStatus(data.status);
     } catch (err) {
       console.error('Error fetching Telegram status:', err);
     }
@@ -53,18 +48,7 @@ export default function TelegramSettingsPage() {
       setIsLoading(true);
       setError(null);
       setSuccess(null);
-
-      const response = await fetch('/api/user/telegram/generate-link-code', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate link code');
-      }
-
-      const data = await response.json();
+      const data = await api.post<{ code: string }>('/user/telegram/generate-link-code', {});
       setLinkCode(data.code);
       setSuccess('Link code generated! Send it to @celorawalletbot on Telegram');
     } catch (err: any) {
@@ -79,22 +63,11 @@ export default function TelegramSettingsPage() {
     if (!confirm('Are you sure you want to unlink your Telegram account?')) {
       return;
     }
-
     try {
       setIsLoading(true);
       setError(null);
       setSuccess(null);
-
-      const response = await fetch('/api/user/telegram/unlink', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to unlink Telegram');
-      }
-
+      await api.post('/user/telegram/unlink', {});
       setStatus({ isLinked: false });
       setSuccess('Telegram account unlinked successfully');
     } catch (err: any) {

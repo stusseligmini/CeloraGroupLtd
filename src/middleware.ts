@@ -18,6 +18,7 @@ import { decodeJwt } from './lib/jwtUtils';
 
 const ACCESS_TOKEN_COOKIE = 'auth-token';
 const ID_TOKEN_COOKIE = 'auth-id-token';
+const SESSION_COOKIE = '__session';
 
 /**
  * Generate UUID v4
@@ -30,7 +31,29 @@ function generateUUID(): string {
   });
 }
 
-function getUserFromRequest(request: NextRequest) {
+async function getUserFromRequest(request: NextRequest) {
+  // Firebase session cookie validation moved to API route (/api/auth/session)
+  // Middleware only checks legacy tokens to avoid Node.js dependencies in Edge runtime
+  
+  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
+  if (sessionToken) {
+    // Decode without verification (verification happens server-side in API routes)
+    try {
+      const payload = decodeJwt(sessionToken);
+      if (payload && (!payload.exp || payload.exp > Math.floor(Date.now() / 1000))) {
+        return {
+          id: payload.uid || payload.sub,
+          email: payload.email,
+          roles: [],
+          authTime: payload.auth_time,
+        };
+      }
+    } catch {
+      // Invalid token, fall through
+    }
+  }
+
+  // Fallback to legacy tokens
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
   const idToken = request.cookies.get(ID_TOKEN_COOKIE)?.value;
   const token = accessToken || idToken;
@@ -59,24 +82,30 @@ function getUserFromRequest(request: NextRequest) {
   };
 }
 
+// Deprecated middleware: forward to proxy behavior for Next.js 15
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
   const correlationId = request.headers.get('x-correlation-id') || generateUUID();
   const path = request.nextUrl.pathname;
   const method = request.method;
 
-  // === RATE LIMITING ===
-  const isAuthRoute = path.startsWith('/signin') || path.startsWith('/signup') || path.startsWith('/api/auth');
+  // Define route checks (used throughout middleware)
+  const isAuthRoute = path.startsWith('/splash') || path.startsWith('/signup') || path.startsWith('/api/auth');
   const isApiRoute = path.startsWith('/api/');
   const isWriteOperation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
 
-  if (isAuthRoute) {
-    const rateLimitResult = await rateLimitMiddleware(request, RateLimitPresets.auth);
-    if (rateLimitResult) return rateLimitResult;
-  } else if (isApiRoute) {
-    const preset = isWriteOperation ? RateLimitPresets.write : RateLimitPresets.read;
-    const rateLimitResult = await rateLimitMiddleware(request, preset);
-    if (rateLimitResult) return rateLimitResult;
+  // === RATE LIMITING ===
+  // Disabled in development mode to allow rapid testing
+  if (process.env.NODE_ENV === 'production') {
+
+    if (isAuthRoute) {
+      const rateLimitResult = await rateLimitMiddleware(request, RateLimitPresets.auth);
+      if (rateLimitResult) return rateLimitResult;
+    } else if (isApiRoute) {
+      const preset = isWriteOperation ? RateLimitPresets.write : RateLimitPresets.read;
+      const rateLimitResult = await rateLimitMiddleware(request, preset);
+      if (rateLimitResult) return rateLimitResult;
+    }
   }
 
   // === CSRF PROTECTION ===
@@ -86,29 +115,29 @@ export async function middleware(request: NextRequest) {
   }
 
   // === AUTH VALIDATION ===
-  const user = getUserFromRequest(request);
+  const user = await getUserFromRequest(request);
 
-  const protectedRoutes = ['/'];
-  const authRoutes = ['/signin', '/signup', '/reset-password', '/update-password'];
+  const authRoutes = ['/splash', '/signup', '/reset-password', '/update-password'];
+  const protectedRoutes = ['/wallet', '/cards', '/casino', '/settings', '/profile'];
   const currentPath = request.nextUrl.pathname;
 
-  const publicPrefixes = ['/api/', '/offline', '/fresh', '/_next/', '/favicon.ico'];
+  const publicPrefixes = ['/api/', '/offline', '/fresh', '/_next/', '/favicon.ico', '/icons/', '/images/'];
   const isPublicPath = publicPrefixes.some((prefix) => currentPath.startsWith(prefix));
+  const isAuthPage = authRoutes.includes(currentPath);
+  const isProtectedRoute = protectedRoutes.some((route) => currentPath.startsWith(route));
 
-  if (!isPublicPath) {
-    const isProtectedRoute = protectedRoutes.some((route) => currentPath.startsWith(route));
-    const isAuthPage = authRoutes.includes(currentPath);
+  // If user is logged in and tries to access auth pages, redirect to home
+  if (user && isAuthPage) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
 
-    if (user && isAuthPage) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-
-    if (!user && isProtectedRoute && currentPath !== '/') {
-      return NextResponse.redirect(new URL('/signin', request.url));
-    }
+  // Temporarily disabled auth check for demo mode
+  if (!user && isProtectedRoute && !isPublicPath) {
+    return NextResponse.redirect(new URL('/splash', request.url));
   }
 
   // === BUILD RESPONSE ===
+  // Use rewrite to emulate proxy for public assets and API when needed
   const response = NextResponse.next();
 
   // Add correlation ID
@@ -153,6 +182,7 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+// Limit middleware scope; prefer proxy for routes in next.config.js
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt).*)'],
 };

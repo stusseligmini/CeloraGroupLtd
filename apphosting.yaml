@@ -11,6 +11,49 @@ env:
       - BUILD
       - RUNTIME
   
+  # Firebase Configuration
+  - variable: FIREBASE_PROJECT_ID
+    value: celora-7b552
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: celora-7b552
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyAnauWfK21qclea_kZM-GqDCHpzombR884
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: celora-7b552.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: celora-7b552.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "505448793868"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:505448793868:web:df0e3f80e669ab47a26b29
+    availability:
+      - BUILD
+      - RUNTIME
+  
   # Neon PostgreSQL Database (connection pooling)
   - variable: DATABASE_URL
     value: postgresql://neondb_owner:npg_GIa7zYk6QSEK@ep-jolly-haze-agouutt1-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require

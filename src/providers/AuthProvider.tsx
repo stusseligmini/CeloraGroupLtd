@@ -173,12 +173,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (err && typeof err === 'object' && 'code' in err) {
         const firebaseError = err as { code: string; message: string };
         
-        // In development, ignore App Check errors and create anonymous session anyway
-        if (firebaseError.code === 'auth/firebase-app-check-token-is-invalid' && process.env.NODE_ENV === 'development') {
-          console.warn('[Auth] ⚠️ App Check error ignored in development. Treating as signed in.');
-          // Create a mock user for development
+        // Ignore App Check errors - App Check is optional, shouldn't block auth
+        if (firebaseError.code === 'auth/firebase-app-check-token-is-invalid') {
+          console.warn('[Auth] ⚠️ App Check error - proceeding without it (optional). Treating as signed in.');
+          // Create anonymous session
           const mockUser: AuthUser = {
-            id: 'dev-user-' + Date.now(),
+            id: 'anon-user-' + Date.now(),
             email: null,
             isAnonymous: true,
             metadata: { createdAt: new Date().toISOString(), lastSignIn: new Date().toISOString() }

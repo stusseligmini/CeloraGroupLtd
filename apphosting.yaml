@@ -11,9 +11,16 @@ env:
       - BUILD
       - RUNTIME
   
-  # Prisma database URL - use placeholder for build, real at runtime
+  # Neon PostgreSQL Database (connection pooling)
   - variable: DATABASE_URL
-    value: postgresql://user:pass@localhost:5432/celora?schema=public
+    value: postgresql://neondb_owner:npg_GIa7zYk6QSEK@ep-jolly-haze-agouutt1-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  # Direct connection for migrations
+  - variable: DIRECT_DATABASE_URL
+    value: postgresql://neondb_owner:npg_GIa7zYk6QSEK@ep-jolly-haze-agouutt1.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require
     availability:
       - BUILD
       - RUNTIME

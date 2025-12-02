@@ -61,7 +61,6 @@ export class RecoveryService {
       where: {
         userId,
         blockchain,
-        mnemonicHash: { not: null },
       },
       orderBy: [
         { isDefault: 'desc' },
@@ -99,12 +98,8 @@ export class RecoveryService {
     method: string,
     args: any[]
   ): Promise<string> {
-    if (!signerWallet.mnemonicHash) {
-      throw new Error('Signer wallet missing encrypted private key');
-    }
-
-    // TODO: Implement mnemonic-based key derivation for signing
-    throw new Error('Guardian operations require implementing mnemonic key derivation');
+    // On-chain guardian operations are disabled under non-custodial policy
+    throw new Error('On-chain guardian operations require external signer; keys are never stored server-side');
     
     /*
     const client = this.getEvmClientOrThrow(blockchain);
@@ -188,9 +183,8 @@ export class RecoveryService {
     if (!this.canUseOnChain(wallet.blockchain)) {
       return;
     }
-
-    if (!wallet.mnemonicHash || !wallet.address) {
-      throw new Error('Wallet missing private key for guardian registration');
+    if (!wallet.address) {
+      throw new Error('Wallet missing on-chain address');
     }
 
     const guardianWallet = await this.getUserWalletForChain(
@@ -310,10 +304,6 @@ export class RecoveryService {
       let onChainTxHash: string | undefined;
 
       if (this.canUseOnChain(wallet.blockchain)) {
-        if (!wallet.mnemonicHash) {
-          throw new Error('Wallet missing encrypted key for on-chain recovery initiation');
-        }
-
         onChainTxHash = await this.executeGuardianContract(
           walletId,
           wallet.blockchain,
@@ -440,14 +430,10 @@ export class RecoveryService {
       );
 
       if (this.canUseOnChain(wallet.blockchain)) {
-        if (!guardianWallet?.mnemonicHash) {
-          throw new Error('Guardian wallet missing private key for on-chain approval');
-        }
-
         await this.executeGuardianContract(
           walletId,
           wallet.blockchain,
-          guardianWallet,
+          guardianWallet || wallet,
           'approveRecovery',
           [this.normalizeAddress(wallet.address), storedHash]
         );
@@ -470,7 +456,7 @@ export class RecoveryService {
           wallet,
           storedHash,
           this.normalizeAddress(storedNewOwner),
-          guardianWallet && guardianWallet.mnemonicHash ? guardianWallet : null
+          null
         );
       }
 
@@ -601,10 +587,6 @@ export class RecoveryService {
           guardianId,
         });
       } else {
-        if (!guardianRecord.wallet.mnemonicHash) {
-          throw new Error('Wallet missing encrypted key for guardian removal');
-        }
-
         await this.executeGuardianContract(
           guardianRecord.walletId,
           guardianRecord.wallet.blockchain,

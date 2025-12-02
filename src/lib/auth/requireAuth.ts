@@ -34,6 +34,10 @@ export async function requireAuth(req: NextRequest) {
     const decoded = await verifyIdToken(token);
     return { user: decoded, error: null };
   } catch (e: any) {
+    const code = (e && (e.code || e.message)) as string | undefined;
+    if (process.env.NODE_ENV === 'development' && code === 'FIREBASE_ADMIN_NOT_CONFIGURED_DEV') {
+      return { user: null, error: 'unauthorized_dev' as const };
+    }
     return { user: null, error: 'invalid_token' as const };
   }
 }

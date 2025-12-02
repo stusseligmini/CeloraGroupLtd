@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { deriveSolanaWallet } from '@/lib/solana/solanaWallet';
-import { hashMnemonic, WalletEncryption, storeWalletLocally } from '@/lib/wallet/nonCustodialWallet';
+import { WalletEncryption, storeWalletLocally } from '@/lib/wallet/nonCustodialWallet';
 import { validateMnemonic } from 'bip39';
 import { InfoIcon, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -51,7 +51,6 @@ export default function ImportWalletPage() {
     try {
       const trimmedMnemonic = mnemonic.trim();
       const solanaWallet = deriveSolanaWallet(trimmedMnemonic, 0);
-      const mnemonicHashValue = hashMnemonic(trimmedMnemonic);
       const encrypted = await WalletEncryption.encrypt(trimmedMnemonic, password);
 
       const response = await fetch('/api/wallet/create', {
@@ -61,7 +60,6 @@ export default function ImportWalletPage() {
           blockchain: 'solana',
           address: solanaWallet.address,
           publicKey: Buffer.from(solanaWallet.publicKey.toBytes()).toString('hex'),
-          mnemonicHash: mnemonicHashValue,
           label: 'Imported Solana Wallet',
           isDefault: true,
           derivationPath: "m/44'/501'/0'/0'",

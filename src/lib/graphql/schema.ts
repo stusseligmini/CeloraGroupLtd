@@ -366,7 +366,7 @@ const WalletInsertInput = new GraphQLInputObjectType({
     balanceFiat: { type: GraphQLFloat },
     fiatCurrency: { type: GraphQLString },
     vaultLevel: { type: GraphQLInt },
-    mnemonicHash: { type: GraphQLString },
+    // No mnemonic or hashes are exposed/stored
     pinHash: { type: GraphQLString },
     derivationPath: { type: GraphQLString },
     createdAt: { type: GraphQLDateTime }, // Allow client to provide, but will auto-set if not provided

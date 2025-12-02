@@ -8,7 +8,6 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { 
   validateMnemonicPhrase,
   deriveWallet, 
-  hashMnemonic,
   WalletEncryption,
   storeWalletLocally,
 } from '@/lib/wallet/nonCustodialWallet';
@@ -160,23 +159,29 @@ export function ImportSolanaWallet() {
       // Step 2: Encrypt mnemonic with password
       const encryptionResult = await WalletEncryption.encrypt(trimmed, password);
 
-      // Step 3: Hash mnemonic for server verification
-      const mnemonicHash = hashMnemonic(trimmed);
-
-      // Step 4: Import wallet via API (uses shared api client to include auth)
-      const walletData = await api.post<{ data: { id: string } }>(
-        '/wallet/import',
-        {
+      // Step 3: Create wallet record via API without sending mnemonic/hash
+      const resp = await fetch('/api/wallet/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           blockchain: 'solana',
-          mnemonic: trimmed,
+          address: solanaWallet.address,
+          publicKey: publicKeyHex,
           label: 'Imported Solana Wallet',
           isDefault: true,
-        }
-      );
+          derivationPath: "m/44'/501'/0'/0'",
+        }),
+      });
+
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Failed to import wallet');
+      }
+      const walletData = await resp.json();
 
       // Step 5: Store encrypted mnemonic locally
       await storeWalletLocally(
-        walletData.data.id,
+        (walletData.wallet?.id || walletData.id),
         encryptionResult.encrypted,
         encryptionResult.salt,
         encryptionResult.iv,

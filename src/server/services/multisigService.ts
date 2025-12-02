@@ -366,7 +366,6 @@ export class MultiSigService {
         userId,
         blockchain,
         walletType: 'standard',
-        mnemonicHash: { not: null },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -392,7 +391,7 @@ export class MultiSigService {
     }
 
     const fundingWallet = await this.getFundingWallet(userId, blockchain);
-    if (!fundingWallet?.mnemonicHash || !fundingWallet.address) {
+    if (!fundingWallet?.address) {
       throw new Error('No funded wallet available to deploy multi-sig contract');
     }
 
@@ -501,7 +500,6 @@ export class MultiSigService {
       where: {
         address: { in: normalizedSigners },
         blockchain: pendingTx.blockchain,
-        mnemonicHash: { not: null },
       },
     });
 
@@ -516,9 +514,8 @@ export class MultiSigService {
         w => this.normalizeAddress(w.address) === signer
       );
 
-      if (!signerWallet?.mnemonicHash) {
-        throw new Error(`Missing mnemonic for signer ${signer}`);
-      }
+      // No mnemonic available or stored by design; on-chain signing unsupported
+      throw new Error('Multi-sig signing requires implementing key management without mnemonic storage');
       
       // TODO: Implement mnemonic-based key derivation
       throw new Error('Multi-sig signing requires implementing mnemonic key derivation');
@@ -543,7 +540,7 @@ export class MultiSigService {
     }
 
     // TODO: Implement mnemonic-based key derivation
-    throw new Error('Multi-sig on-chain execution requires implementing mnemonic key derivation');
+    throw new Error('Multi-sig on-chain execution requires implementing signer key management without mnemonic storage');
 
     /*
     const packedSignatures = packSafeSignatures(signaturePayloads);

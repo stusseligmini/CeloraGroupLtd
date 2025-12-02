@@ -67,60 +67,11 @@ const ENABLE_AUTO_COLLECT = process.env.APPINSIGHTS_AUTO_COLLECT !== 'false';
  * Initialize Application Insights for server-side tracking
  */
 export function initializeServerTelemetry(config?: Partial<ServerTelemetryConfig>): void {
-  if (isInitialized) {
-    console.log('[ServerTelemetry] Already initialized');
-    return;
-  }
-
-  const connectionString = config?.connectionString || CONNECTION_STRING;
-  if (!connectionString) {
-    console.warn('[ServerTelemetry] Missing connection string, telemetry disabled');
-    return;
-  }
-
-  try {
-    // Dynamically import applicationinsights
-    const appInsights = require('applicationinsights');
-    
-    appInsights
-      .setup(connectionString)
-      .setAutoCollectRequests(config?.enableAutoCollect ?? ENABLE_AUTO_COLLECT)
-      .setAutoCollectPerformance(config?.enableAutoCollect ?? ENABLE_AUTO_COLLECT, true)
-      .setAutoCollectExceptions(true)
-      .setAutoCollectDependencies(true)
-      .setAutoCollectConsole(true, true)
-      .setUseDiskRetryCaching(true)
-      .setSendLiveMetrics(process.env.NODE_ENV === 'production')
-      .setDistributedTracingMode(2) // AI_AND_W3C
-      .start();
-
-    telemetryClient = appInsights.defaultClient;
-
-    // Set sampling percentage
-    telemetryClient.config.samplingPercentage = config?.samplingPercentage ?? SAMPLING_PERCENTAGE;
-
-    // Add custom telemetry initializer
-    telemetryClient.addTelemetryProcessor((envelope: any) => {
-      envelope.tags['ai.cloud.role'] = 'celora-pwa';
-      envelope.tags['ai.cloud.roleInstance'] = 'server';
-
-      if (envelope.data.baseData) {
-        envelope.data.baseData.properties = {
-          ...envelope.data.baseData.properties,
-          appVersion: process.env.APP_VERSION || '1.0.0',
-          environment: process.env.NODE_ENV || 'development',
-        };
-      }
-
-      return true;
-    });
-
-    isInitialized = true;
-    console.log('[ServerTelemetry] Initialized successfully');
-  } catch (error) {
-    console.error('[ServerTelemetry] Initialization failed:', error);
-    console.log('[ServerTelemetry] Running in stub mode - install applicationinsights package');
-  }
+  // Azure Application Insights removed from stack; disable telemetry initialization.
+  if (isInitialized) return;
+  console.warn('[ServerTelemetry] Application Insights disabled (package removed)');
+  telemetryClient = null; // Explicitly null to force console fallback paths.
+  isInitialized = true;
 }
 
 /**

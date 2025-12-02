@@ -140,9 +140,7 @@ function transformEntityData(data: any, userId: string, entityName?: string): an
     if (transformed.label === undefined) {
       transformed.label = null;
     }
-    if (transformed.mnemonicHash === undefined) {
-      transformed.mnemonicHash = null;
-    }
+    // No mnemonic hash persisted per policy; remove field normalization
     if (transformed.pinHash === undefined) {
       transformed.pinHash = null;
     }

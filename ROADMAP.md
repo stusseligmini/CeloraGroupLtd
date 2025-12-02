@@ -408,3 +408,20 @@ Integrations
 **Status:** Phase 1-2 Complete ✅ + Phase 4 Casino Features ✅  
 **Progress:** ~75% Complete - Ready for Beta Testing  
 **Next:** Security Audit + Backup System (Phase 5)
+
+---
+
+## 🔌 WalletConnect Reintroduction Plan
+
+WalletConnect remains disabled to keep production builds stable after removing Azure/MSAL and test-only transitive deps.
+
+- Re-enable behind a client-only feature flag.
+- Use dynamic `import()` guarded in UI to avoid server bundling.
+- Ensure logging is tree-shakable; avoid `pino`/`thread-stream` in client bundles.
+- Validate with a canary build; if test frameworks leak into prod, revert and file an issue.
+
+## 🔐 Non-Custodial Enforcement Notes
+
+- Keys and mnemonics never leave the client.
+- Server stores only public addresses, labels, and metadata — no mnemonic-derived hashes.
+- On-chain recovery/multisig require an external signer; server paths are gated with explicit errors until signer infrastructure exists.

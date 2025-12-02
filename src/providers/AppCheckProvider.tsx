@@ -6,14 +6,8 @@
 
 'use client';
 
-import { useEffect } from 'react';
-import { initializeFirebaseAppCheck } from '@/lib/firebase/appCheck';
-
+// Note: Firebase App Check is initialized in src/lib/firebase/client.ts
+// This provider is kept for backwards compatibility but does nothing
 export function AppCheckProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    // Initialize App Check on mount
-    initializeFirebaseAppCheck();
-  }, []);
-
   return <>{children}</>;
 }

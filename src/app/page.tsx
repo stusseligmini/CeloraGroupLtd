@@ -37,7 +37,21 @@ export default function HomePage() {
   }
 
   if (!user) {
-    return null; // Redirecting to signin
+    // Unauthenticated state (dev without Firebase or user signed out): show a minimal prompt
+    return (
+      <DashboardShell title="Celora" subtitle="Sign in to continue">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6">
+          <p className="text-gray-400">You are not signed in.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/splash')}
+            className="cel-button cel-button--primary"
+          >
+            Go to Sign In
+          </button>
+        </div>
+      </DashboardShell>
+    );
   }
 
   return (

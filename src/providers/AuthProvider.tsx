@@ -8,7 +8,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { auth } from '@/lib/firebase/client';
+import { auth, isFirebaseClientConfigured } from '@/lib/firebase/client';
 import { 
   signInAnonymously, 
   signInWithCustomToken,
@@ -105,7 +105,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    console.log('[Auth useEffect] STARTED. isConfigured:', isFirebaseClientConfigured, 'typeof auth:', typeof auth);
+    
+    if (!isFirebaseClientConfigured) {
+      console.log('[Auth] ❌ Firebase NOT configured');
+      setUser(null);
+      setSession(null);
+      setApiAuthToken(null);
+      setLoading(false);
+      console.log('[Auth] ✅ Loading set to FALSE (not configured)');
+      return;
+    }
+
+    console.log('[Auth] ✅ Firebase IS configured, setting up listener...');
+    
+    if (!auth) {
+      console.error('[Auth] ERROR: auth is null/undefined even though isConfigured=true');
+      setLoading(false);
+      return;
+    }
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('[Auth] onAuthStateChanged FIRED. Has user:', !!firebaseUser);
       try {
         if (firebaseUser) {
           const normalized = normalizeFirebaseUser(firebaseUser);
@@ -120,12 +141,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('[Auth] Error in auth state change:', err);
         setError(err instanceof Error ? err : new Error('Auth state change failed'));
       } finally {
+        console.log('[Auth] Setting loading to FALSE (finally block)');
         setLoading(false);
       }
     }, (error) => {
       // Handle auth state change errors
       console.error('[Auth] Auth state observer error:', error);
       setError(error);
+      console.log('[Auth] Setting loading to FALSE (error handler)');
       setLoading(false);
     });
 
@@ -135,15 +158,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async (): Promise<AuthResult> => {
     setError(null);
     try {
+      if (!isFirebaseClientConfigured) {
+        const e = new Error('Auth not configured in development');
+        setError(e);
+        return { error: e };
+      }
       await signInAnonymously(auth);
       return {};
     } catch (err) {
       console.error('[Auth] Sign in failed:', err);
       const failure = err instanceof Error ? err : new Error('Failed to sign in');
       
-      // Check if it's a network error
+      // Check if it's a network or App Check error
       if (err && typeof err === 'object' && 'code' in err) {
         const firebaseError = err as { code: string; message: string };
+        
+        // In development, ignore App Check errors and create anonymous session anyway
+        if (firebaseError.code === 'auth/firebase-app-check-token-is-invalid' && process.env.NODE_ENV === 'development') {
+          console.warn('[Auth] ⚠️ App Check error ignored in development. Treating as signed in.');
+          // Create a mock user for development
+          const mockUser: AuthUser = {
+            id: 'dev-user-' + Date.now(),
+            email: null,
+            isAnonymous: true,
+            metadata: { createdAt: new Date().toISOString(), lastSignIn: new Date().toISOString() }
+          };
+          setUser(mockUser);
+          return {};
+        }
+        
         if (firebaseError.code === 'auth/network-request-failed') {
           const networkError = new Error('Network error: Unable to connect to Firebase. Please check your internet connection or try again later.');
           setError(networkError);
@@ -159,6 +202,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithToken = useCallback(async (token: string): Promise<AuthResult> => {
     setError(null);
     try {
+      if (!isFirebaseClientConfigured) {
+        const e = new Error('Auth not configured in development');
+        setError(e);
+        return { error: e };
+      }
       await signInWithCustomToken(auth, token);
       return {};
     } catch (err) {
@@ -170,7 +218,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await firebaseSignOut(auth);
+      if (isFirebaseClientConfigured) {
+        await firebaseSignOut(auth!);
+      }
       setApiAuthToken(null);
       setUser(null);
       setSession(null);

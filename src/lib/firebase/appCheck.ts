@@ -30,22 +30,31 @@ let appCheckInstance: AppCheck | null = null;
 
 /**
  * Initialize Firebase App Check with reCAPTCHA Enterprise
- * Call this once in your app initialization
+ * 
+ * WARNING: This function is DEPRECATED and should not be called directly.
+ * Firebase App Check is automatically initialized in src/lib/firebase/client.ts
+ * 
+ * This function is kept for backwards compatibility only.
  */
 export function initializeFirebaseAppCheck() {
   // Only initialize in browser
   if (typeof window === 'undefined') {
+    console.log('[AppCheck] Skipping - not in browser');
     return null;
   }
 
   // Return existing instance if already initialized
   if (appCheckInstance) {
+    console.log('[AppCheck] Already initialized, returning existing instance');
     return appCheckInstance;
   }
+
+  console.warn('[AppCheck] ⚠️ This function is deprecated. AppCheck should be initialized in client.ts');
 
   try {
     // Get or initialize Firebase app
     const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+    console.log('[AppCheck] Using Firebase app:', !!app);
 
     // Get reCAPTCHA Enterprise site key
     const siteKey = recaptchaConfig.v3.siteKey;

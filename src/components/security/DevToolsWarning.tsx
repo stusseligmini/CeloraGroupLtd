@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 export function DevToolsWarning() {
+  // Suppress the banner in development to avoid noisy local UX
+  if (process.env.NODE_ENV === 'development') {
+    return null;
+  }
+
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
 
   useEffect(() => {

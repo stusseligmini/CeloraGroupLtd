@@ -15,9 +15,11 @@ interface NavItem {
 
 interface DashboardShellProps {
   children: React.ReactNode;
+  title?: string;
+  subtitle?: string;
 }
 
-export function DashboardShell({ children }: DashboardShellProps) {
+export function DashboardShell({ children, title, subtitle }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const { user, signOut } = useAuth();
@@ -243,7 +245,13 @@ export function DashboardShell({ children }: DashboardShellProps) {
         </header>
 
         {/* Page content */}
-        <main className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <main className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+          {title || subtitle ? (
+            <div className="space-y-1">
+              {title ? <h1 className="text-2xl font-semibold text-white">{title}</h1> : null}
+              {subtitle ? <p className="text-gray-400">{subtitle}</p> : null}
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
 import { useTelegramMiniApp } from '@/components/telegram/TelegramMiniAppProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
 
-export default function LinkTelegramPage() {
+function LinkTelegramPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isMiniApp, user: telegramUser, ready } = useTelegramMiniApp();
@@ -195,6 +195,14 @@ export default function LinkTelegramPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+export default function LinkTelegramPage() {
+  return (
+    <Suspense fallback={<AppShell title="Link Telegram" subtitle="Loading..."><div className="p-8 text-slate-300">Loading…</div></AppShell>}>
+      <LinkTelegramPageInner />
+    </Suspense>
   );
 }
 

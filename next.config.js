@@ -18,9 +18,7 @@ const nextConfig = {
   poweredByHeader: false,
   
   // Next.js 15 configuration
-  experimental: {
-    optimizePackageImports: ['framer-motion', 'lucide-react'],
-  },
+  experimental: {},
   
   // Compiler optimizations
   compiler: {
@@ -79,10 +77,6 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
-          },
-          {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.helius-rpc.com https://api.coingecko.com https://*.solana.com https://*.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://firestore.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.helius-rpc.com wss://api.devnet.solana.com wss://*.solana.com; frame-ancestors 'none';",
           },
         ],
       },
@@ -172,6 +166,9 @@ const nextConfig = {
     if (isServer) {
       config.externals = [...(config.externals || []), 'canvas', 'jsdom'];
     }
+
+    // Simplified: remove custom thread-stream/pino stubbing since WalletConnect disabled.
+    // Preserve only essential experiment flags already removed.
     
     return config;
   },

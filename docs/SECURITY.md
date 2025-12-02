@@ -7,12 +7,14 @@
 - Client-side mnemonic generation (BIP39)
 - Local encryption (AES-GCM, PBKDF2)
 - All signing happens in browser/mobile
+ - No mnemonic-derived hashes are stored or transmitted
 
 ### Database Schema
 - Stores ONLY public addresses
 - No `encryptedPrivateKey` field
 - No `mnemonicHash` field
 - Balance cache for UI only
+ - Recovery/multisig execution is gated server-side with explicit errors until an external signer architecture is in place
 
 ## Critical Security Measures
 

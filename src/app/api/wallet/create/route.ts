@@ -67,14 +67,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create wallet - ONLY store public information
-    // Private keys are NEVER stored on the server
+    // Private keys and any mnemonic-related data are NEVER stored on the server
     const wallet = await prisma.wallet.create({
       data: {
         userId,
         blockchain: body.blockchain,
         address: body.address,
         publicKey: body.publicKey || null,
-        mnemonicHash: body.mnemonicHash || null, // Only hash stored for recovery verification
         label: body.label || null,
         isDefault: body.isDefault || false,
         derivationPath: body.derivationPath || null,

@@ -67,7 +67,7 @@ export const WalletCreateRequestSchema = z.object({
   blockchain: BlockchainSchema,
   address: z.string(), // Wallet address (derived client-side)
   publicKey: z.string().optional(), // Public key (derived client-side)
-  mnemonicHash: z.string().optional(), // SHA-256 hash of mnemonic for recovery verification only
+  // No mnemonic or hash persisted per roadmap
   label: z.string().min(1).max(100).optional(),
   isDefault: z.boolean().default(false),
   derivationPath: z.string().optional(),

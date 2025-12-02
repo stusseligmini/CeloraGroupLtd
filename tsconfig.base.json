@@ -11,8 +11,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": [
-      "node",
-      "jest"
+      "node"
     ],
     "outDir": "dist",
     "lib": [
@@ -25,7 +24,7 @@
     "noEmit": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "incremental": true,
+    "incremental": false,
     "plugins": [
       {
         "name": "next"

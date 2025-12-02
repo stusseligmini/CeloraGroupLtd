@@ -37,24 +37,8 @@ export function getFirebaseAdmin(): { app: App; auth: Auth } {
     projectId,
   };
 
-  if (serviceAccount) {
-    let serviceAccountJson;
-    try {
-      serviceAccountJson = JSON.parse(serviceAccount);
-      adminConfig.credential = cert(serviceAccountJson);
-    } catch {
-      // If not JSON, try as path to file
-      try {
-        const serviceAccountPath = serviceAccount;
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        serviceAccountJson = require(serviceAccountPath);
-        adminConfig.credential = cert(serviceAccountJson);
-      } catch (error) {
-        // If service account fails, try using default credentials (for local development with Firebase CLI)
-        console.warn('[Firebase Admin] Failed to load service account, trying default credentials:', error);
-      }
-    }
-  } else if (clientEmail && privateKeyRaw && projectId) {
+  // First priority: decomposed env vars (works in all environments)
+  if (clientEmail && privateKeyRaw && projectId) {
     // Normalize escaped newlines
     const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
     try {
@@ -63,11 +47,21 @@ export function getFirebaseAdmin(): { app: App; auth: Auth } {
         clientEmail,
         privateKey,
       });
+      console.log('[Firebase Admin] ✅ Initialized with decomposed env vars');
     } catch (e) {
       console.error('[Firebase Admin] Failed to build credential from env vars:', e);
     }
+  } else if (serviceAccount) {
+    // Second priority: try JSON string
+    try {
+      const serviceAccountJson = JSON.parse(serviceAccount);
+      adminConfig.credential = cert(serviceAccountJson);
+      console.log('[Firebase Admin] ✅ Initialized with JSON service account');
+    } catch (error) {
+      console.warn('[Firebase Admin] Failed to parse service account JSON:', error);
+    }
   } else {
-    console.warn('[Firebase Admin] No service account JSON or decomposed key env vars found; falling back to default credentials');
+    console.warn('[Firebase Admin] No service account credentials found; using default credentials (application default credentials or emulator)');
   }
 
   if (!projectId) {
@@ -95,6 +89,14 @@ export async function verifyIdToken(idToken: string) {
   } catch (error) {
     // Log error but don't expose details in production
     console.error('[Firebase Admin] Token verification failed:', error instanceof Error ? error.message : 'Unknown error');
+    // In development, surface a stable error to allow friendly 401 handling
+    if (process.env.NODE_ENV === 'development') {
+      const devErr = new Error('FIREBASE_ADMIN_NOT_CONFIGURED_DEV');
+      // Attach a recognizable code
+      // @ts-expect-error augment
+      devErr.code = 'FIREBASE_ADMIN_NOT_CONFIGURED_DEV';
+      throw devErr;
+    }
     throw error;
   }
 }

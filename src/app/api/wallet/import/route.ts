@@ -20,7 +20,7 @@ const WalletImportRequestSchema = z.object({
  * POST /api/wallet/import - Import wallet from mnemonic phrase
  * 
  * NON-CUSTODIAL: This endpoint imports a wallet from a mnemonic phrase.
- * Only public keys and mnemonic hash are stored on the server.
+ * Only public keys are stored on the server. No mnemonic or hashes are persisted.
  */
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
 
     const walletData = wallets[0];
 
-    // Hash mnemonic for verification
-    const mnemonicHash = hashMnemonic(body.mnemonic);
+    // Do not persist mnemonic or hashes per roadmap policy
 
     // Check if wallet with same address already exists
     const existingWallet = await prisma.wallet.findFirst({
@@ -64,11 +63,6 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingWallet) {
-      // Verify mnemonic hash matches if wallet exists
-      if (existingWallet.mnemonicHash && existingWallet.mnemonicHash !== mnemonicHash) {
-        return errorResponse('CONFLICT', 'Wallet with this address exists but mnemonic does not match', 409, undefined, requestId);
-      }
-      
       return errorResponse('CONFLICT', 'Wallet with this address already exists', 409, undefined, requestId);
     }
 
@@ -80,14 +74,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create wallet - ONLY store public information
+    // Create wallet - ONLY store public information (no mnemonic or hash)
     const wallet = await prisma.wallet.create({
       data: {
         userId,
         blockchain: body.blockchain,
         address: walletData.address,
         publicKey: walletData.publicKey,
-        mnemonicHash, // Store hash for verification
         label: body.label || null,
         isDefault: body.isDefault || false,
         derivationPath: walletData.derivationPath,

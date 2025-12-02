@@ -1,5 +1,5 @@
 import React from 'react';
-import WalletConnectManager from '@/components/WalletConnectManager';
+import WalletConnectDisabled from '@/components/WalletConnectDisabled';
 
 export default function DAppsPage() {
   return (
@@ -8,7 +8,7 @@ export default function DAppsPage() {
         <div className="px-4 py-6 sm:px-0">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">dApp Browser</h1>
           
-          <WalletConnectManager />
+          <WalletConnectDisabled />
         </div>
       </div>
     </div>

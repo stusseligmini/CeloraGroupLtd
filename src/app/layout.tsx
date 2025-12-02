@@ -4,13 +4,13 @@ import { AuthProvider } from '../providers/AuthProvider'
 import { ThemeProvider } from '../providers/ThemeProvider'
 import { ToastProvider } from '../providers/ToastProvider'
 import { DevToolsWarning } from '../components/security/DevToolsWarning'
+import { DevModeBanner } from '../components/dev/DevModeBanner'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration'
 import { TelemetryProvider } from '../components/TelemetryProvider'
 import { TelegramMiniAppProvider } from '../components/telegram/TelegramMiniAppProvider'
 import { AppCheckProvider } from '../providers/AppCheckProvider'
-import { headers } from 'next/headers'
-import { CspNonceProvider } from '../lib/cspHelpers'
+// Note: In development we avoid dynamic rendering by not reading headers
 
 export const metadata: Metadata = {
   title: 'Celora',
@@ -32,20 +32,17 @@ export const viewport = {
   viewportFit: 'cover',
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Get the CSP nonce from headers (set by middleware)
-  const headersList = await headers();
-  const nonce = headersList.get('x-nonce') || '';
+  const nonce = '';
   
   return (
     <html lang="en" className="dark">
       <head>
-        {/* Make nonce available to client components via meta tag */}
-        <meta name="csp-nonce" content={nonce} />
+        {/* In dev, nonce is omitted to keep layout static */}
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover, user-scalable=yes" />
         {/* iOS: prevent phone/email auto-link styling and improve mobile experience */}
@@ -79,6 +76,7 @@ export default async function RootLayout({
               </TelegramMiniAppProvider>
             </ErrorBoundary>
             <DevToolsWarning />
+            <DevModeBanner />
             <ToastProvider />
             <ServiceWorkerRegistration />
           </TelemetryProvider>

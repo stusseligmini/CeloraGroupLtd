@@ -222,10 +222,7 @@ export function CreateSolanaWallet() {
       // Step 2: Encrypt mnemonic with password
       const encryptionResult = await WalletEncryption.encrypt(mnemonic, password);
 
-      // Step 3: Hash mnemonic for server verification
-      const mnemonicHash = hashMnemonic(mnemonic);
-
-      // Step 4: Create wallet via API
+      // Step 3: Create wallet via API (no mnemonic/hash sent to server)
       const response = await fetch('/api/wallet/create', {
         method: 'POST',
         headers: {
@@ -235,7 +232,6 @@ export function CreateSolanaWallet() {
           blockchain: 'solana',
           address: solanaWallet.address,
           publicKey: publicKeyHex,
-          mnemonicHash: mnemonicHash,
           label: 'My Solana Wallet',
           isDefault: true,
           derivationPath: "m/44'/501'/0'/0'",

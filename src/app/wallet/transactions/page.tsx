@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -29,7 +29,7 @@ type FilterType = 'all' | 'send' | 'receive' | 'card_payment' | 'casino_deposit'
 type BlockchainFilter = 'all' | 'solana' | 'ethereum' | 'bitcoin';
 type StatusFilter = 'all' | 'pending' | 'confirmed' | 'failed';
 
-export default function TransactionsPage() {
+function TransactionsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
@@ -560,5 +560,13 @@ export default function TransactionsPage() {
         </div>
       )}
     </DashboardShell>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<DashboardShell><div className="p-8 text-slate-300">Loading transactions…</div></DashboardShell>}>
+      <TransactionsPageInner />
+    </Suspense>
   );
 }

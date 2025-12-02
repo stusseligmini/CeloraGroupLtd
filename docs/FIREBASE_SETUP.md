@@ -325,6 +325,33 @@ After successful deployment:
 
 ---
 
+## 🔐 Local Firebase Admin Credentials
+
+For server-side token verification in local development, the Firebase Admin SDK needs credentials. Provide them via a service account JSON or decomposed env vars.
+
+1) Point to the service account JSON:
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Users\volde\Desktop\Celora rebuild\CeloraV2\firebase-admin-key.json"; npm run start
+```
+
+2) Or use decomposed env vars in `.env.local`:
+
+```
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=service-account@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...escaped newlines...\n-----END PRIVATE KEY-----\n"
+```
+
+When credentials are missing, Admin may fall back to default credentials and not validate tokens. In development, consider gating server auth to return a friendly 401 instead of blocking flows.
+
+## 🧪 Troubleshooting (Local)
+
+- Red banner “Developer tools detected”: client safety warning; close devtools or gate the banner behind `NODE_ENV !== 'development'`.
+- Admin credential warning: set `GOOGLE_APPLICATION_CREDENTIALS` or the decomposed env vars above.
+
+---
+
 ## 📚 Resources
 
 - [Firebase App Hosting Docs](https://firebase.google.com/docs/app-hosting)

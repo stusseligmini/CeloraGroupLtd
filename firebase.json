@@ -1,31 +1,24 @@
 {
   "hosting": {
-    "public": ".next",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-    "cleanUrls": true,
+    "cleanUrls": false,
     "headers": [
-      {
-        "source": "/_next/static/**",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      },
       {
         "source": "**",
         "headers": [
           { "key": "X-Content-Type-Options", "value": "nosniff" },
           { "key": "X-Frame-Options", "value": "DENY" },
-          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, proxy-revalidate" }
         ]
       }
     ],
     "rewrites": [
-      { "source": "/_next/**", "destination": "/_next/**" },
-      { "source": "/static/**", "destination": "/static/**" },
       { "source": "**", "function": "nextServer" }
     ]
   },

@@ -24,19 +24,21 @@ const globalForPrisma = globalThis as unknown as {
  */
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === 'development'
-        ? ['query', 'error', 'warn']
-        : ['error'],
-    
-    // PgBouncer compatibility settings
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
-  });
+  (process.env.DATABASE_URL
+    ? new PrismaClient({
+        log:
+          process.env.NODE_ENV === 'development'
+            ? ['query', 'error', 'warn']
+            : ['error'],
+        
+        // PgBouncer compatibility settings
+        datasources: {
+          db: {
+            url: process.env.DATABASE_URL,
+          },
+        },
+      })
+    : null) as PrismaClient;
 
 // Store singleton in development to prevent hot-reload issues
 if (process.env.NODE_ENV !== 'production') {

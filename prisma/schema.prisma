@@ -12,6 +12,8 @@ datasource db {
   url       = env("DATABASE_URL")
   // Direct connection for migrations (Neon connection pooling)
   directUrl = env("DIRECT_DATABASE_URL")
+  // Skip validation during build if DATABASE_URL not available
+  relationMode = "prisma"
 }
 
 // User account model (Firebase Auth)

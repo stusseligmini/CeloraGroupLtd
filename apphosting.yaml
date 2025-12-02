@@ -1,13 +1,20 @@
-# Firebase App Hosting configuration note
-#
-# This project deploys on Firebase App Hosting (Node builder) with Next.js.
-# The builder runs `npm ci` and `next build` using your package.json. If you
-# want to speed up installs and avoid dev-only tooling in CI, this repo ships
-# an `.npmrc` with `omit=dev`.
-#
-# Stack:
-# - Hosting: Firebase App Hosting
-# - Auth: Firebase Authentication + App Check (reCAPTCHA Enterprise)
-# - Database: Firestore
-# - Functions/Server: Next.js API Routes
+# Firebase App Hosting configuration
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+
+env:
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  # Prisma database URL - use placeholder for build, real at runtime
+  - variable: DATABASE_URL
+    value: postgresql://user:pass@localhost:5432/celora?schema=public
+    availability:
+      - BUILD
+      - RUNTIME
 

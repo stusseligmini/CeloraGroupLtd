@@ -24,12 +24,48 @@ function ExtensionLoading() {
 }
 
 function ExtensionContent() {
-  const { user, loading } = useAuthContext();
+  const { user, loading, session } = useAuthContext();
   const appUrl = useAppUrl();
   const [activeTab, setActiveTab] = useState<'wallet' | 'cards' | 'notifications'>('wallet');
+  const [settingsData, setSettingsData] = useState<any>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   const openApp = () => {
     window.open(appUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const testSettings = async () => {
+    if (!session?.accessToken) {
+      setSettingsError('No auth token available. Please sign in first.');
+      return;
+    }
+
+    setSettingsLoading(true);
+    setSettingsError(null);
+    setSettingsData(null);
+
+    try {
+      const apiBase = (window as any).__CELORA_API_BASE__ || `${appUrl}/api`;
+      const response = await fetch(`${apiBase}/settings`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setSettingsData(data);
+    } catch (error: any) {
+      setSettingsError(error.message || 'Failed to fetch settings');
+    } finally {
+      setSettingsLoading(false);
+    }
   };
 
   const subtitle = user ? 'Quick glance at your wallet' : 'Sign in with your Celora account';
@@ -40,9 +76,21 @@ function ExtensionContent() {
       title="Celora"
       subtitle={subtitle}
       actions={
-        <button type="button" className="cel-button cel-button--ghost" onClick={openApp}>
-          Open app
-        </button>
+        <>
+          <button type="button" className="cel-button cel-button--ghost" onClick={openApp}>
+            Open app
+          </button>
+          {user && (
+            <button 
+              type="button" 
+              className="cel-button cel-button--ghost" 
+              onClick={testSettings}
+              disabled={settingsLoading}
+            >
+              {settingsLoading ? '...' : 'Test Settings'}
+            </button>
+          )}
+        </>
       }
     >
       {loading ? (
@@ -79,6 +127,31 @@ function ExtensionContent() {
             {activeTab === 'cards' && user && <CardManagement />}
             {activeTab === 'notifications' && <NotificationPanel limit={5} showFooter={false} />}
           </div>
+
+          {/* Settings Test Result */}
+          {(settingsData || settingsError) && (
+            <div className="cel-card" style={{ marginTop: '12px' }}>
+              <div className="cel-card__header">
+                <span className="cel-eyebrow">API Test: /api/settings</span>
+              </div>
+              {settingsError && (
+                <div className="cel-error">{settingsError}</div>
+              )}
+              {settingsData && (
+                <pre style={{ 
+                  fontSize: '10px', 
+                  overflow: 'auto', 
+                  maxHeight: '200px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  color: '#22D3EE'
+                }}>
+                  {JSON.stringify(settingsData, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
         </>
       )}
     </AppShell>

@@ -40,12 +40,16 @@
       if (!this._initialized) await this.init();
 
       try {
+        console.log('[CeloraAuth] Attempting sign in for:', email);
+        
         // Sign in with Firebase
         const user = await window.FirebaseAuth.signInWithEmailAndPassword(email, password);
         this._currentUser = user;
+        console.log('[CeloraAuth] ✅ Firebase sign in successful, uid:', user.uid);
 
         // Get ID token
         const idToken = await window.FirebaseAuth.getIdToken();
+        console.log('[CeloraAuth] ✅ ID token acquired, length:', idToken?.length);
 
         // Save to local storage keys
         await this._saveSession({
@@ -57,10 +61,10 @@
           expiresAt: Date.now() + 3600000
         });
 
-        console.log('[CeloraAuth] Sign in successful:', user.email);
+        console.log('[CeloraAuth] ✅ Session saved, sign in complete');
         return { user, token: idToken };
       } catch (error) {
-        console.error('[CeloraAuth] Sign in failed:', error);
+        console.error('[CeloraAuth] ❌ Sign in failed:', error.message);
         throw new Error(error.message || 'Sign in failed');
       }
     },
@@ -87,8 +91,28 @@
       if (!this._initialized) await this.init();
 
       try {
-        // Get fresh token from Firebase (auto-refreshes if needed)
+        // Check session expiry first
+        const session = await this._getStoredSession();
+        if (session && session.expiresAt) {
+          const timeRemaining = session.expiresAt - Date.now();
+          console.log('[CeloraAuth] Token expiry check:', {
+            expiresAt: new Date(session.expiresAt).toISOString(),
+            timeRemainingMs: timeRemaining,
+            needsRefresh: timeRemaining < 300000 // 5 minutes
+          });
+
+          // Force refresh if less than 5 minutes remaining
+          if (timeRemaining < 300000) {
+            console.log('[CeloraAuth] Token expiring soon, forcing refresh');
+            const idToken = await window.FirebaseAuth.getIdToken(true);
+            console.log('[CeloraAuth] ✅ Token refreshed, length:', idToken?.length);
+            return idToken;
+          }
+        }
+
+        // Get token (Firebase will auto-refresh if needed)
         const idToken = await window.FirebaseAuth.getIdToken();
+        console.log('[CeloraAuth] ✅ Token acquired, length:', idToken?.length);
         return idToken;
       } catch (error) {
         console.error('[CeloraAuth] Get token failed:', error);

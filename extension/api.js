@@ -49,6 +49,15 @@
             ...options.headers
           };
 
+          // Debug log headers (without full token)
+          console.log('[CeloraAPI] Request headers:', {
+            url: endpoint,
+            hasAuthorization: !!headers['Authorization'],
+            tokenPrefix: token?.substring(0, 20) + '...',
+            userId: user?.uid,
+            method: options.method || 'GET'
+          });
+
           // Make request
           const response = await fetch(url, {
             ...options,

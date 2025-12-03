@@ -5,10 +5,12 @@
   },
   "private": true,
   "scripts": {
+    "build": "npm install && npx prisma generate",
     "deploy": "firebase deploy --only functions",
     "start": "node index.js"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "cross-fetch": "^4.0.0",
     "dotenv": "^16.0.0",
     "firebase-admin": "^12.5.0",
@@ -16,5 +18,8 @@
     "next": "16.0.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }

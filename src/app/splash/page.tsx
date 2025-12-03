@@ -19,7 +19,8 @@ export default function SplashPage() {
   const handleGetStarted = async () => {
     try {
       console.log('[Splash] Starting sign in...');
-      const result = await signIn();
+      // Use anonymous login for splash page quick start
+      const result = await signIn('anonymous@celora.com', 'quickstart');
       console.log('[Splash] Sign in result:', result);
       if (result.success !== false) {
         console.log('[Splash] Sign in successful, user should be set');

@@ -13,7 +13,7 @@ interface AuthState {
 }
 
 interface UseAuthReturn extends AuthState {
-  signIn: () => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<boolean>;
   refreshSession: () => Promise<boolean>;
@@ -36,8 +36,8 @@ export function useAuth(): UseAuthReturn {
     updateUser,
   } = useAuthContext();
 
-  const wrappedSignIn = useCallback(async () => {
-    const result = await signIn();
+  const wrappedSignIn = useCallback(async (email: string, password: string) => {
+    const result = await signIn(email, password);
 
     if (!result.error) {
       return { success: true };

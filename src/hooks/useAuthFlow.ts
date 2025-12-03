@@ -109,7 +109,7 @@ export function useRequireAuth(): AuthState {
   useEffect(() => {
     if (!auth.loading && !auth.isAuthenticated) {
       console.warn('[Auth] User not authenticated, triggering sign-in');
-      signIn();
+      signIn('anonymous@celora.com', 'quickstart');
     }
   }, [auth.loading, auth.isAuthenticated, signIn]);
   

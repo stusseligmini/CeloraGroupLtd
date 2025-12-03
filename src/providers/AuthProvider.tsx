@@ -12,6 +12,8 @@ import { auth, isFirebaseClientConfigured } from '@/lib/firebase/client';
 import { 
   signInAnonymously, 
   signInWithCustomToken,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   User as FirebaseUser
@@ -38,7 +40,7 @@ export interface AuthContextValue {
   session: AuthSession | null;
   loading: boolean;
   error: Error | null;
-  signIn: () => Promise<AuthResult>;
+  signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string) => Promise<AuthResult>;
   signInWithToken: (token: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -155,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [setSessionFromFirebase]);
 
-  const signIn = useCallback(async (): Promise<AuthResult> => {
+  const signIn = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     setError(null);
     try {
       if (!isFirebaseClientConfigured) {
@@ -163,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(e);
         return { error: e };
       }
-      await signInAnonymously(auth);
+      await signInWithEmailAndPassword(auth, email, password);
       return {};
     } catch (err) {
       console.error('[Auth] Sign in failed:', err);
@@ -239,8 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     setError(null);
     try {
-      // TODO: Implement sign up with Firebase
-      await signInAnonymously(auth);
+      await createUserWithEmailAndPassword(auth, email, password);
       return {};
     } catch (err) {
       const failure = err instanceof Error ? err : new Error('Failed to sign up');

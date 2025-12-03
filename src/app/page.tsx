@@ -8,7 +8,7 @@ import Image from 'next/image';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading, signIn } = useAuth();
+  const { user, isLoading, signIn, signUp } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [password, setPassword] = useState('');
@@ -37,7 +37,7 @@ export default function HomePage() {
       }
       
       try {
-        const result = await signIn();
+        const result = await signIn(email || 'user@celora.com', password);
         if (result.success !== false) {
           router.push('/wallet');
         } else {
@@ -54,7 +54,7 @@ export default function HomePage() {
       }
       
       try {
-        const result = await signIn();
+        const result = await signUp(email, password);
         if (result.success !== false) {
           router.push('/onboarding');
         } else {
@@ -193,7 +193,14 @@ export default function HomePage() {
       </button>
 
       {/* CELORA Text */}
-      <h1 className="text-7xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent mb-4 tracking-wider">
+      <h1 
+        className="text-7xl font-bold mb-4 tracking-wider"
+        style={{
+          color: '#22D3EE',
+          WebkitTextStroke: '2px #F97316',
+          textShadow: '0 0 20px rgba(34, 211, 238, 0.5)'
+        }}
+      >
         CELORA
       </h1>
 

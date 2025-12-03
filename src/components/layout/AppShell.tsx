@@ -26,7 +26,8 @@ export function AppShell({
   const { user, loading, signIn, signOut } = useAuthContext();
 
   const handleSignIn = async () => {
-    await signIn();
+    // Quick anonymous sign in - main page has proper login form
+    await signIn('anonymous@celora.com', 'quickstart');
   };
 
   const handleSignOut = async () => {

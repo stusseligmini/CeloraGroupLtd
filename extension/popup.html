@@ -7,23 +7,15 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body data-app-url="https://celora-7b552.web.app" data-api-base="">
-    <!-- Fallback lock UI (works even if React bundle fails) -->
-    <div id="celora-fallback" class="fallback" role="button" aria-label="Open Celora">
-      <div class="fallback-card">
-        <div class="fallback-header">
-          <span class="fallback-icon" aria-hidden="true">🔒</span>
-          <span class="fallback-title">Celora Lock</span>
-        </div>
-      </div>
-    </div>
-
     <!-- React root -->
     <div id="root"></div>
     
-    <!-- Load React from CDN for extension popup -->
+    <!-- Load React from CDN -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
     <script>
+      // Initialize app config
       (function () {
         var appUrl = document.body.dataset.appUrl || 'https://celora-7b552.web.app';
         var apiBase = document.body.dataset.apiBase;
@@ -34,31 +26,302 @@
         window.__CELORA_API_BASE__ = apiBase || appUrl + '/api';
       })();
     </script>
+    
     <script>
-      // Fallback: clicking anywhere on the lock card opens the app
-      (function () {
-        var fallback = document.getElementById('celora-fallback');
-        if (!fallback) return;
-        function openApp() {
-          var appUrl = window.__CELORA_APP_URL__ || (document.body.dataset.appUrl || 'https://celora-7b552.web.app');
-          try {
-            if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+      // Self-contained React app - no imports needed
+      (function() {
+        const { createElement: h, useState, useEffect, useContext, createContext } = React;
+        const { createRoot } = ReactDOM;
+        
+        // Auth Context
+        const AuthContext = createContext(null);
+        
+        function AuthProvider({ children }) {
+          const [user, setUser] = useState(null);
+          const [token, setToken] = useState(null);
+          const [loading, setLoading] = useState(true);
+          
+          useEffect(() => {
+            // Try to load session from chrome.storage
+            if (typeof chrome !== 'undefined' && chrome.storage) {
+              chrome.storage.local.get(['celoraUser', 'celoraToken'], (result) => {
+                if (result.celoraUser) setUser(result.celoraUser);
+                if (result.celoraToken) setToken(result.celoraToken);
+                setLoading(false);
+              });
+            } else {
+              setLoading(false);
+            }
+          }, []);
+          
+          const signIn = async (email, password) => {
+            const apiBase = window.__CELORA_API_BASE__;
+            try {
+              const res = await fetch(`${apiBase}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+              });
+              if (!res.ok) throw new Error('Login failed');
+              const data = await res.json();
+              setUser(data.user);
+              setToken(data.token);
+              if (chrome.storage) {
+                chrome.storage.local.set({ celoraUser: data.user, celoraToken: data.token });
+              }
+              return { success: true };
+            } catch (error) {
+              return { success: false, error: error.message };
+            }
+          };
+          
+          const signOut = () => {
+            setUser(null);
+            setToken(null);
+            if (chrome.storage) {
+              chrome.storage.local.remove(['celoraUser', 'celoraToken']);
+            }
+          };
+          
+          return h(AuthContext.Provider, {
+            value: { user, token, loading, signIn, signOut }
+          }, children);
+        }
+        
+        function useAuth() {
+          return useContext(AuthContext);
+        }
+        
+        // Components
+        function LockScreen() {
+          const { signIn } = useAuth();
+          const [email, setEmail] = useState('');
+          const [password, setPassword] = useState('');
+          const [error, setError] = useState('');
+          const [isLoading, setIsLoading] = useState(false);
+          
+          const handleSubmit = async (e) => {
+            e.preventDefault();
+            setError('');
+            setIsLoading(true);
+            const result = await signIn(email, password);
+            setIsLoading(false);
+            if (!result.success) {
+              setError(result.error || 'Login failed');
+            }
+          };
+          
+          const openApp = () => {
+            const appUrl = window.__CELORA_APP_URL__;
+            if (chrome.tabs) {
               chrome.tabs.create({ url: appUrl });
             } else {
-              window.open(appUrl, '_blank', 'noopener,noreferrer');
+              window.open(appUrl, '_blank');
             }
-          } catch (e) {
-            window.open(appUrl, '_blank');
-          }
+          };
+          
+          return h('div', { className: 'fallback' },
+            h('div', { className: 'fallback-card', style: { height: 'auto', padding: '20px' } },
+              h('div', { className: 'fallback-header', style: { marginBottom: '16px' } },
+                h('span', { className: 'fallback-icon' }, '🔒'),
+                h('span', { className: 'fallback-title' }, 'Celora Lock')
+              ),
+              error && h('div', { 
+                className: 'cel-error', 
+                style: { marginBottom: '12px', fontSize: '11px' } 
+              }, error),
+              h('form', { onSubmit: handleSubmit, style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                h('input', {
+                  type: 'email',
+                  placeholder: 'Email',
+                  value: email,
+                  onChange: (e) => setEmail(e.target.value),
+                  required: true,
+                  style: {
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: '#f8fafc',
+                    fontSize: '12px'
+                  }
+                }),
+                h('input', {
+                  type: 'password',
+                  placeholder: 'Password',
+                  value: password,
+                  onChange: (e) => setPassword(e.target.value),
+                  required: true,
+                  style: {
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: '#f8fafc',
+                    fontSize: '12px'
+                  }
+                }),
+                h('button', {
+                  type: 'submit',
+                  disabled: isLoading,
+                  className: 'cel-button cel-button--primary',
+                  style: { marginTop: '4px' }
+                }, isLoading ? 'Signing in...' : 'Sign In')
+              ),
+              h('button', {
+                type: 'button',
+                onClick: openApp,
+                className: 'cel-button cel-button--ghost',
+                style: { marginTop: '8px', width: '100%' }
+              }, 'Open Celora App')
+            )
+          );
         }
-        fallback.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          openApp();
-        });
+        
+        function WalletView() {
+          const { user, token, signOut } = useAuth();
+          const [activeTab, setActiveTab] = useState('wallet');
+          const [settingsData, setSettingsData] = useState(null);
+          const [settingsError, setSettingsError] = useState(null);
+          const [settingsLoading, setSettingsLoading] = useState(false);
+          
+          const openApp = () => {
+            const appUrl = window.__CELORA_APP_URL__;
+            if (chrome.tabs) {
+              chrome.tabs.create({ url: appUrl });
+            } else {
+              window.open(appUrl, '_blank');
+            }
+          };
+          
+          const testSettings = async () => {
+            if (!token) {
+              setSettingsError('No auth token available');
+              return;
+            }
+            
+            setSettingsLoading(true);
+            setSettingsError(null);
+            setSettingsData(null);
+            
+            try {
+              const apiBase = window.__CELORA_API_BASE__;
+              const res = await fetch(`${apiBase}/settings`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+              }
+              
+              const data = await res.json();
+              setSettingsData(data);
+            } catch (error) {
+              setSettingsError(error.message);
+            } finally {
+              setSettingsLoading(false);
+            }
+          };
+          
+          return h('div', { className: 'cel-shell--extension' },
+            // Header
+            h('div', { className: 'cel-shell__header' },
+              h('div', null,
+                h('div', { className: 'cel-shell__eyebrow' }, 'CELORA'),
+                h('h1', { className: 'cel-shell__title' }, 'Wallet'),
+                h('p', { className: 'cel-shell__subtitle' }, user?.email || 'Connected')
+              ),
+              h('div', { className: 'cel-shell__actions' },
+                h('button', {
+                  type: 'button',
+                  className: 'cel-button cel-button--ghost',
+                  onClick: openApp,
+                  style: { fontSize: '10px', padding: '6px 10px' }
+                }, 'Open App'),
+                h('button', {
+                  type: 'button',
+                  className: 'cel-button cel-button--ghost',
+                  onClick: testSettings,
+                  disabled: settingsLoading,
+                  style: { fontSize: '10px', padding: '6px 10px' }
+                }, settingsLoading ? '...' : 'Test API'),
+                h('button', {
+                  type: 'button',
+                  className: 'cel-button cel-button--outline',
+                  onClick: signOut,
+                  style: { fontSize: '10px', padding: '6px 10px' }
+                }, 'Sign Out')
+              )
+            ),
+            
+            // Main content
+            h('div', { className: 'cel-shell__main' },
+              // Wallet overview card
+              h('div', { className: 'cel-card' },
+                h('div', { className: 'cel-card__header' },
+                  h('span', { className: 'cel-eyebrow' }, 'BALANCE')
+                ),
+                h('div', { className: 'cel-metric' },
+                  h('span', { className: 'cel-metric__value' }, '$0.00'),
+                  h('span', { className: 'cel-metric__caption' }, 'Total portfolio value')
+                )
+              ),
+              
+              // Settings test result
+              (settingsData || settingsError) && h('div', { 
+                className: 'cel-card',
+                style: { marginTop: '12px' }
+              },
+                h('div', { className: 'cel-card__header' },
+                  h('span', { className: 'cel-eyebrow' }, 'API TEST: /api/settings')
+                ),
+                settingsError && h('div', { className: 'cel-error' }, settingsError),
+                settingsData && h('pre', {
+                  style: {
+                    fontSize: '10px',
+                    overflow: 'auto',
+                    maxHeight: '200px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    color: '#22D3EE',
+                    margin: 0
+                  }
+                }, JSON.stringify(settingsData, null, 2))
+              )
+            )
+          );
+        }
+        
+        function App() {
+          const { user, loading } = useAuth();
+          
+          if (loading) {
+            return h('div', { className: 'cel-loading' },
+              h('div', { className: 'cel-loading__spinner' }),
+              h('p', { className: 'cel-loading__label' }, 'Loading...')
+            );
+          }
+          
+          return user ? h(WalletView) : h(LockScreen);
+        }
+        
+        function Root() {
+          return h(AuthProvider, null, h(App));
+        }
+        
+        // Mount app
+        const container = document.getElementById('root');
+        if (container) {
+          const root = createRoot(container);
+          root.render(h(Root));
+        }
       })();
     </script>
-    <script src="dist/popup.js"></script>
   </body>
 </html>
 

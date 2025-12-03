@@ -19,7 +19,7 @@
     "test:e2e:debug": "playwright test --debug",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "check": "npm run lint && npm run typecheck",
-    "build:extension": "node scripts/build-extension.mjs",
+    "build:extension": "node scripts/build-extension-simple.mjs",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

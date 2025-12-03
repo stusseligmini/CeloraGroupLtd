@@ -41,6 +41,7 @@ export interface AuthContextValue {
   loading: boolean;
   error: Error | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
+  signInAnonymous: () => Promise<AuthResult>;
   signUp: (email: string, password: string) => Promise<AuthResult>;
   signInWithToken: (token: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -218,6 +219,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const signInAnonymous = useCallback(async (): Promise<AuthResult> => {
+    setError(null);
+    try {
+      if (!isFirebaseClientConfigured) {
+        const e = new Error('Auth not configured in development');
+        setError(e);
+        return { error: e };
+      }
+      await signInAnonymously(auth);
+      return {};
+    } catch (err) {
+      const failure = err instanceof Error ? err : new Error('Failed to sign in anonymously');
+      setError(failure);
+      return { error: failure };
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       if (isFirebaseClientConfigured) {
@@ -295,6 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       error,
       signIn,
+      signInAnonymous,
       signUp,
       signInWithToken,
       signOut,
@@ -303,7 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       triggerPasswordReset,
       confirmPasswordReset,
     }),
-    [user, session, loading, error, signIn, signUp, signInWithToken, signOut, refreshSession, updateUser, triggerPasswordReset, confirmPasswordReset]
+    [user, session, loading, error, signIn, signInAnonymous, signUp, signInWithToken, signOut, refreshSession, updateUser, triggerPasswordReset, confirmPasswordReset]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

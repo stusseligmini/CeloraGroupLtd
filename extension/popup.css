@@ -10,6 +10,43 @@ body {
   color: #f8fafc;
 }
 
+/* Fallback lock styles */
+.fallback {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.fallback-card {
+  width: 280px;
+  height: 180px;
+  border-radius: 16px;
+  border: 2px solid #22D3EE; /* cyan */
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.25);
+  background: rgba(7, 13, 26, 0.65);
+  position: relative;
+}
+
+.fallback-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: #e2e8f0;
+}
+
+.fallback-icon {
+  font-size: 18px;
+  color: #22D3EE;
+}
+
+.fallback-title {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
 .cel-shell--extension {
   width: 320px;
   min-height: 0;

@@ -14,6 +14,7 @@ interface AuthState {
 
 interface UseAuthReturn extends AuthState {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInAnonymous?: () => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<boolean>;
   refreshSession: () => Promise<boolean>;
@@ -29,6 +30,7 @@ export function useAuth(): UseAuthReturn {
     loading,
     error,
     signIn,
+    signInAnonymous,
     signUp,
     signOut,
     refreshSession,
@@ -55,6 +57,15 @@ export function useAuth(): UseAuthReturn {
 
     return { success: false, error: result.error.message };
   }, [signUp]);
+
+  const wrappedSignInAnonymous = useCallback(async () => {
+    if (!signInAnonymous) return { success: false, error: 'Anonymous sign-in not available' };
+    const result = await signInAnonymous();
+    if (!result.error) {
+      return { success: true };
+    }
+    return { success: false, error: result.error.message };
+  }, [signInAnonymous]);
 
   const wrappedSignOut = useCallback(async () => {
     try {
@@ -109,6 +120,7 @@ export function useAuth(): UseAuthReturn {
   return {
     ...state,
     signIn: wrappedSignIn,
+    signInAnonymous: wrappedSignInAnonymous,
     signUp: wrappedSignUp,
     signOut: wrappedSignOut,
     refreshSession: wrappedRefresh,

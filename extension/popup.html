@@ -7,6 +7,17 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body data-app-url="https://celora-7b552.web.app" data-api-base="">
+    <!-- Fallback lock UI (works even if React bundle fails) -->
+    <div id="celora-fallback" class="fallback" role="button" aria-label="Open Celora">
+      <div class="fallback-card">
+        <div class="fallback-header">
+          <span class="fallback-icon" aria-hidden="true">🔒</span>
+          <span class="fallback-title">Celora Lock</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- React root -->
     <div id="root"></div>
     <script>
       (function () {
@@ -17,6 +28,30 @@
         }
         window.__CELORA_APP_URL__ = appUrl;
         window.__CELORA_API_BASE__ = apiBase || appUrl + '/api';
+      })();
+    </script>
+    <script>
+      // Fallback: clicking anywhere on the lock card opens the app
+      (function () {
+        var fallback = document.getElementById('celora-fallback');
+        if (!fallback) return;
+        function openApp() {
+          var appUrl = window.__CELORA_APP_URL__ || (document.body.dataset.appUrl || 'https://celora-7b552.web.app');
+          try {
+            if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+              chrome.tabs.create({ url: appUrl });
+            } else {
+              window.open(appUrl, '_blank', 'noopener,noreferrer');
+            }
+          } catch (e) {
+            window.open(appUrl, '_blank');
+          }
+        }
+        fallback.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          openApp();
+        });
       })();
     </script>
     <script src="dist/popup.js"></script>

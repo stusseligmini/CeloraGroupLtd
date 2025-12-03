@@ -8,7 +8,7 @@ import Image from 'next/image';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading, signIn, signUp } = useAuth();
+  const { user, isLoading, signIn, signInAnonymous, signUp } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [password, setPassword] = useState('');
@@ -23,6 +23,7 @@ export default function HomePage() {
   }, [user, isLoading, router]);
 
   const handleLockClick = () => {
+    console.log('[Home] Lock clicked');
     setShowAuth(true);
   };
 
@@ -30,21 +31,30 @@ export default function HomePage() {
     setError('');
     
     if (isLogin) {
-      // Login - bare kode/password
-      if (!password) {
-        setError('Enter password or PIN');
-        return;
-      }
-      
-      try {
-        const result = await signIn(email || 'user@celora.com', password);
-        if (result.success !== false) {
-          router.push('/wallet');
-        } else {
-          setError(result.error || 'Login failed');
+      // If user provided credentials, perform email/password login
+      if (email && password) {
+        try {
+          const result = await signIn(email, password);
+          if (result.success !== false) {
+            router.push('/wallet');
+          } else {
+            setError(result.error || 'Login failed');
+          }
+        } catch (err) {
+          setError('Login error');
         }
-      } catch (err) {
-        setError('Login error');
+      } else {
+        // No credentials: allow quick anonymous entry
+        try {
+          const result = await (signInAnonymous?.() ?? Promise.resolve({ success: false, error: 'Anonymous sign-in unavailable' }));
+          if (result.success !== false) {
+            router.push('/wallet');
+          } else {
+            setError(result.error || 'Anonymous login failed');
+          }
+        } catch (err) {
+          setError('Anonymous login error');
+        }
       }
     } else {
       // Register - bare email og password
@@ -183,8 +193,10 @@ export default function HomePage() {
 
       {/* Lock Icon - clickable */}
       <button
-        onClick={handleLockClick}
-        className="group relative mb-12 focus:outline-none"
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleLockClick(); }}
+        className="group relative mb-12 focus:outline-none cursor-pointer z-10"
+        aria-label="Open authentication"
       >
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-3xl blur-2xl opacity-50 group-hover:opacity-75 transition-opacity" />
         <div className="relative w-32 h-32 flex items-center justify-center bg-slate-900/80 rounded-3xl border-2 border-cyan-400/50 group-hover:border-cyan-400 transition-all group-hover:scale-110">

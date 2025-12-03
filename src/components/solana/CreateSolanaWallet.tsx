@@ -15,10 +15,11 @@ import {
   type WalletKey 
 } from '@/lib/wallet/nonCustodialWallet';
 import { deriveSolanaWallet } from '@/lib/solana/solanaWallet';
+import { setWalletPin } from '@/lib/wallet/pinManagement';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/providers/AuthProvider';
 
-type Step = 'generate' | 'backup' | 'verify' | 'password' | 'complete';
+type Step = 'generate' | 'backup' | 'verify' | 'password' | 'pin-setup' | 'complete';
 
 interface PasswordStrength {
   score: number; // 0-4 (0=weak, 4=very strong)
@@ -62,6 +63,46 @@ function calculatePasswordStrength(password: string): PasswordStrength {
   };
 }
 
+/**
+ * Calculate PIN strength (4-8 digits)
+ */
+function calculatePinStrength(pin: string): PasswordStrength {
+  if (!pin) {
+    return { score: 0, feedback: 'Enter a 4-8 digit PIN' };
+  }
+
+  if (!/^\d+$/.test(pin)) {
+    return { score: 0, feedback: 'PIN must contain only digits' };
+  }
+
+  if (pin.length < 4) {
+    return { score: 1, feedback: `Need ${4 - pin.length} more digits` };
+  }
+
+  let score = 2;
+  const feedback: string[] = [];
+
+  // Check for repeating patterns
+  if (/^(\d)\1+$/.test(pin)) {
+    return { score: 1, feedback: 'Avoid repeating digits (like 1111)' };
+  }
+
+  // Check for sequential patterns
+  if (/(?:012|123|234|345|456|567|678|789|890|1234|2345|3456|4567|5678|6789)/.test(pin)) {
+    score = 2;
+    feedback.push('Avoid sequential numbers');
+  }
+
+  if (pin.length >= 6) score = 3;
+  if (pin.length >= 8) score = 4;
+
+  const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Very Strong'];
+  return {
+    score,
+    feedback: feedback.length > 0 ? feedback.join('. ') : strengthLabels[score],
+  };
+}
+
 export function CreateSolanaWallet() {
   const router = useRouter();
   const { user } = useAuthContext();
@@ -78,6 +119,12 @@ export function CreateSolanaWallet() {
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [walletPublicKey, setWalletPublicKey] = useState<string>('');
   
+  // PIN setup state
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinStrength, setPinStrength] = useState<PasswordStrength>({ score: 0, feedback: '' });
+  const [pinError, setPinError] = useState<string | null>(null);
+  
   // Verification state
   const [verificationWords, setVerificationWords] = useState<{ index: number; word: string }[]>([]);
   const [userAnswers, setUserAnswers] = useState<string[]>(['', '', '']);
@@ -89,6 +136,8 @@ export function CreateSolanaWallet() {
       setMnemonic('');
       setPassword('');
       setConfirmPassword('');
+      setPin('');
+      setConfirmPin('');
       setUserAnswers(['', '', '']);
     };
   }, []);
@@ -107,6 +156,13 @@ export function CreateSolanaWallet() {
       setPasswordStrength(calculatePasswordStrength(password));
     }
   }, [password, step]);
+
+  // Calculate PIN strength
+  useEffect(() => {
+    if (step === 'pin-setup') {
+      setPinStrength(calculatePinStrength(pin));
+    }
+  }, [pin, step]);
 
   // Generate new mnemonic
   const handleGenerateNew = () => {
@@ -254,8 +310,8 @@ export function CreateSolanaWallet() {
         localStorage
       );
 
-      // Step 6: Move to complete step
-      setStep('complete');
+      // Step 6: Move to PIN setup
+      setStep('pin-setup');
       
       // SECURITY: Clear sensitive data from memory
       setMnemonic('');
@@ -264,6 +320,55 @@ export function CreateSolanaWallet() {
     } catch (err: any) {
       setError(err.message || 'Failed to create wallet');
       console.error('Error creating wallet:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Setup PIN
+  const handleSetupPin = async () => {
+    setPinError(null);
+
+    if (!pin || !confirmPin) {
+      setPinError('Please enter and confirm your PIN');
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      setPinError('PINs do not match');
+      return;
+    }
+
+    if (!/^\d+$/.test(pin)) {
+      setPinError('PIN must contain only digits');
+      return;
+    }
+
+    if (pin.length < 4 || pin.length > 8) {
+      setPinError('PIN must be between 4 and 8 digits');
+      return;
+    }
+
+    if (pinStrength.score < 2) {
+      setPinError('Please use a stronger PIN');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Store PIN locally with encryption
+      await setWalletPin(pin);
+
+      // Clear PIN from memory
+      setPin('');
+      setConfirmPin('');
+
+      // Move to complete step
+      setStep('complete');
+    } catch (err: any) {
+      setPinError(err.message || 'Failed to setup PIN');
+      console.error('Error setting up PIN:', err);
     } finally {
       setLoading(false);
     }
@@ -556,6 +661,110 @@ export function CreateSolanaWallet() {
           </div>
         );
 
+      case 'pin-setup':
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold mb-2">Set Your Wallet PIN</h3>
+              <p className="text-gray-600">
+                Create a 4-8 digit PIN to quickly unlock your wallet. This adds an extra layer of security.
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800 font-semibold mb-1">🔒 Security Note</p>
+              <p className="text-sm text-blue-700">
+                Your PIN is encrypted and stored locally. Never share it with anyone.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">PIN (4-8 digits)</label>
+                <Input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setPin(value);
+                  }}
+                  placeholder="Enter 4-8 digits"
+                  className="w-full text-lg tracking-widest"
+                  maxLength={8}
+                />
+                {pin && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            pinStrength.score === 0 ? 'bg-red-500 w-0'
+                            : pinStrength.score === 1 ? 'bg-red-500 w-1/4'
+                            : pinStrength.score === 2 ? 'bg-yellow-500 w-1/2'
+                            : pinStrength.score === 3 ? 'bg-green-500 w-3/4'
+                            : 'bg-green-600 w-full'
+                          }`}
+                        />
+                      </div>
+                      <span className={`text-xs font-medium ${
+                        pinStrength.score === 0 ? 'text-red-600'
+                        : pinStrength.score === 1 ? 'text-red-600'
+                        : pinStrength.score === 2 ? 'text-yellow-600'
+                        : pinStrength.score === 3 ? 'text-green-600'
+                        : 'text-green-700'
+                      }`}>
+                        {pinStrength.feedback}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Confirm PIN</label>
+                <Input
+                  type="password"
+                  value={confirmPin}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setConfirmPin(value);
+                  }}
+                  placeholder="Re-enter your PIN"
+                  className="w-full text-lg tracking-widest"
+                  maxLength={8}
+                />
+                {confirmPin && pin !== confirmPin && (
+                  <p className="text-red-600 text-xs mt-1">PINs do not match</p>
+                )}
+              </div>
+            </div>
+
+            {pinError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800">{pinError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setStep('password')}
+                disabled={loading}
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleSetupPin}
+                disabled={loading || !pin || !confirmPin || pin !== confirmPin || pinStrength.score < 2}
+                className="flex-1"
+              >
+                {loading ? 'Setting PIN...' : 'Complete Setup'}
+              </Button>
+            </div>
+          </div>
+        );
+
       case 'complete':
         return (
           <div className="space-y-6 text-center">
@@ -608,27 +817,28 @@ export function CreateSolanaWallet() {
           {step === 'backup' && 'Back up your recovery phrase'}
           {step === 'verify' && 'Verify your recovery phrase'}
           {step === 'password' && 'Set your password'}
+          {step === 'pin-setup' && 'Set your PIN'}
           {step === 'complete' && 'Wallet created successfully'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {/* Progress indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          {['generate', 'backup', 'verify', 'password', 'complete'].map((s, index) => (
+          {['generate', 'backup', 'verify', 'password', 'pin-setup', 'complete'].map((s, index) => (
             <React.Fragment key={s}>
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  ['generate', 'backup', 'verify', 'password', 'complete'].indexOf(step) >= index
+                  ['generate', 'backup', 'verify', 'password', 'pin-setup', 'complete'].indexOf(step) >= index
                     ? 'bg-cyan-600 text-white'
                     : 'bg-gray-200 text-gray-600'
                 }`}
               >
                 {index + 1}
               </div>
-              {index < 4 && (
+              {index < 5 && (
                 <div
                   className={`w-12 h-1 ${
-                    ['generate', 'backup', 'verify', 'password', 'complete'].indexOf(step) > index
+                    ['generate', 'backup', 'verify', 'password', 'pin-setup', 'complete'].indexOf(step) > index
                       ? 'bg-cyan-600'
                       : 'bg-gray-200'
                   }`}

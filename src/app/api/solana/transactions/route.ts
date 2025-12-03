@@ -3,12 +3,19 @@ import { errorResponse, successResponse } from '@/lib/validation/validate';
 import { logger } from '@/lib/logger';
 import { getUserIdFromRequest } from '@/lib/auth/serverAuth';
 import { PrismaClient } from '@prisma/client';
+import { addTransaction, getWalletTransactions } from '@/lib/firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 const prisma = new PrismaClient();
 
 /**
  * GET /api/solana/transactions - Get transaction history for a wallet
- * Uses Helius Enhanced Transactions API
+ * 
+ * Syncs transactions to:
+ * - Firestore (real-time sync for extension/telegram)
+ * - PostgreSQL (persistent storage)
+ * 
+ * Uses Helius Enhanced Transactions API for blockchain data
  */
 export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -99,6 +106,60 @@ export async function GET(request: NextRequest) {
       };
     }).slice(0, limit);
 
+    // Sync transactions to Firestore and PostgreSQL
+    for (const tx of transactions) {
+      try {
+        // Log to Firestore for real-time sync
+        await addTransaction(userId, {
+          walletId: wallet.id,
+          txHash: tx.signature,
+          blockchain: 'solana',
+          fromAddress: tx.from,
+          toAddress: tx.to,
+          amount: tx.amount,
+          tokenSymbol: 'SOL',
+          status: tx.status as 'pending' | 'confirmed' | 'failed',
+          timestamp: Timestamp.fromMillis(tx.timestamp * 1000),
+          memo: tx.memo || undefined,
+        });
+
+        // Also store in PostgreSQL for persistence
+        try {
+          await prisma.transaction.upsert({
+            where: { txHash: tx.signature },
+            update: { status: tx.status as any },
+            create: {
+              walletId: wallet.id,
+              txHash: tx.signature,
+              blockchain: 'solana',
+              blockNumber: BigInt(tx.slot || 0),
+              fromAddress: tx.from,
+              toAddress: tx.to,
+              amount: tx.amount,
+              tokenSymbol: 'SOL',
+              gasFee: tx.fee?.toString(),
+              status: tx.status as 'pending' | 'confirmed' | 'failed',
+              confirmations: tx.status === 'confirmed' ? 1 : 0,
+              timestamp: new Date(tx.timestamp * 1000),
+              memo: tx.memo,
+            },
+          });
+        } catch (dbError) {
+          logger.warn('Could not store transaction in PostgreSQL', { 
+            walletId: wallet.id, 
+            txHash: tx.signature,
+            requestId,
+          });
+        }
+      } catch (firestoreError) {
+        logger.warn('Could not sync transaction to Firestore', { 
+          walletId: wallet.id, 
+          txHash: tx.signature,
+          requestId,
+        });
+      }
+    }
+
     logger.info('Fetched transaction history', {
       userId,
       address,
@@ -108,7 +169,7 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ transactions, address }, 200, requestId);
   } catch (error) {
-    logger.error('Error fetching transaction history', error, { requestId });
+    logger.error('Error fetching transaction history', error instanceof Error ? error : undefined, { requestId });
     return errorResponse(
       'INTERNAL_SERVER_ERROR',
       'Failed to fetch transactions',

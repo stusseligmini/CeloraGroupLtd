@@ -94,154 +94,119 @@ body {
   50% { transform: translateY(-10px); }
 }
 
-.cel-lock-icon {
-  width: 280px;
-  height: 340px;
+.cel-icon {
+  width: 240px;
+  height: 300px;
   margin: 0 auto;
   position: relative;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-/* Lock shackle (top curved part) */
-.cel-lock-icon__shackle {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 140px;
-  height: 140px;
-  border: 24px solid;
-  border-image: linear-gradient(180deg, #00d4ff 0%, #0066ff 50%, #1e40af 100%) 1;
-  border-bottom: none;
-  border-radius: 80px 80px 0 0;
-  background: transparent;
+  background: 
+    linear-gradient(135deg, 
+      rgba(10, 245, 211, 0.3) 0%, 
+      rgba(14, 165, 233, 0.4) 25%,
+      rgba(59, 130, 246, 0.5) 50%,
+      rgba(30, 64, 175, 0.4) 75%,
+      rgba(255, 159, 64, 0.3) 100%
+    );
+  border-radius: 60px;
+  backdrop-filter: blur(40px);
   box-shadow: 
-    inset 0 0 40px rgba(0, 212, 255, 0.4),
-    0 0 60px rgba(0, 102, 255, 0.5),
-    0 10px 80px rgba(30, 64, 175, 0.3);
+    inset 0 0 80px rgba(10, 245, 211, 0.2),
+    inset 0 0 120px rgba(59, 130, 246, 0.15),
+    0 0 100px rgba(10, 245, 211, 0.4),
+    0 0 200px rgba(59, 130, 246, 0.3),
+    0 40px 120px rgba(255, 159, 64, 0.2);
+  animation: iconGlow 3s ease-in-out infinite alternate;
 }
 
-/* Lock body (main square part) */
-.cel-lock-icon__body {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 220px;
-  height: 220px;
-  background: linear-gradient(135deg, #0a4a6b 0%, #1e3a8a 25%, #1e40af 50%, #ff8c00 100%);
-  border-radius: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 
-    inset 0 6px 50px rgba(255, 255, 255, 0.15),
-    inset 0 -12px 70px rgba(0, 0, 0, 0.4),
-    0 25px 100px rgba(0, 102, 255, 0.6),
-    0 0 150px rgba(30, 64, 175, 0.5),
-    0 50px 120px rgba(255, 140, 0, 0.4);
-  animation: bodyGlow 2.5s ease-in-out infinite alternate;
-}
-
-.cel-lock-icon__body::before {
-  content: '';
-  position: absolute;
-  inset: 14px;
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, transparent 100%);
-  border-radius: 26px;
-  box-shadow: inset 0 3px 35px rgba(255, 255, 255, 0.15);
-}
-
-@keyframes bodyGlow {
-  from {
-    box-shadow: 
-      inset 0 6px 50px rgba(255, 255, 255, 0.15),
-      inset 0 -12px 70px rgba(0, 0, 0, 0.4),
-      0 25px 100px rgba(0, 102, 255, 0.6),
-      0 0 150px rgba(30, 64, 175, 0.5),
-      0 50px 120px rgba(255, 140, 0, 0.4);
-  }
-  to {
-    box-shadow: 
-      inset 0 6px 50px rgba(255, 255, 255, 0.25),
-      inset 0 -12px 70px rgba(0, 0, 0, 0.5),
-      0 25px 120px rgba(0, 102, 255, 0.8),
-      0 0 200px rgba(30, 64, 175, 0.7),
-      0 50px 140px rgba(255, 140, 0, 0.6);
-  }
-}
-
-/* C logo in center of lock body */
-.cel-lock-icon__c-logo {
-  font-size: 140px;
-  font-weight: 900;
-  font-family: 'Arial Black', sans-serif;
-  background: linear-gradient(180deg, #00d4ff 0%, #0ea5e9 50%, #0066ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 0 50px rgba(0, 212, 255, 0.8)) drop-shadow(0 4px 30px rgba(0, 102, 255, 0.6));
-  z-index: 2;
-  line-height: 1;
-  animation: cLogoGlow 2s ease-in-out infinite alternate;
-}
-
-@keyframes cLogoGlow {
+@keyframes iconGlow {
   0% {
-    filter: drop-shadow(0 0 50px rgba(0, 212, 255, 0.8)) drop-shadow(0 4px 30px rgba(0, 102, 255, 0.6));
+    box-shadow: 
+      inset 0 0 80px rgba(10, 245, 211, 0.2),
+      inset 0 0 120px rgba(59, 130, 246, 0.15),
+      0 0 100px rgba(10, 245, 211, 0.4),
+      0 0 200px rgba(59, 130, 246, 0.3),
+      0 40px 120px rgba(255, 159, 64, 0.2);
   }
   100% {
-    filter: drop-shadow(0 0 80px rgba(0, 212, 255, 1)) drop-shadow(0 8px 50px rgba(0, 102, 255, 0.9));
+    box-shadow: 
+      inset 0 0 100px rgba(10, 245, 211, 0.3),
+      inset 0 0 150px rgba(59, 130, 246, 0.25),
+      0 0 140px rgba(10, 245, 211, 0.6),
+      0 0 240px rgba(59, 130, 246, 0.5),
+      0 60px 150px rgba(255, 159, 64, 0.3);
   }
 }
 
-/* Chip on top center of lock */
-.cel-lock-icon__chip {
+.cel-icon__chip {
   position: absolute;
-  top: 115px;
+  top: 50px;
   left: 50%;
   transform: translateX(-50%);
-  width: 65px;
-  height: 52px;
-  background: linear-gradient(135deg, #ffd700 0%, #ffb300 40%, #ff9500 100%);
-  border-radius: 10px;
+  width: 55px;
+  height: 44px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb300 50%, #ff9f40 100%);
+  border-radius: 8px;
   box-shadow: 
-    inset 0 4px 15px rgba(0, 0, 0, 0.3),
-    inset 0 -3px 10px rgba(255, 255, 255, 0.5),
-    0 8px 30px rgba(255, 215, 0, 0.9),
+    inset 0 3px 12px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 8px rgba(255, 255, 255, 0.4),
+    0 6px 25px rgba(255, 215, 0, 0.9),
     0 0 50px rgba(255, 179, 0, 0.7);
-  z-index: 10;
 }
 
-.cel-lock-icon__chip::before {
+.cel-icon__chip::before {
   content: '';
   position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
+  top: 9px;
+  left: 9px;
+  right: 9px;
+  bottom: 9px;
   background: linear-gradient(135deg, #ff9f40 0%, #ffd700 50%, #ffb300 100%);
-  border-radius: 4px;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
-.cel-lock-icon__chip::after {
+.cel-icon__chip::after {
   content: '';
   position: absolute;
-  top: 14px;
-  left: 14px;
-  width: 37px;
-  height: 24px;
+  top: 12px;
+  left: 12px;
+  width: 31px;
+  height: 20px;
   background-image: 
-    repeating-linear-gradient(0deg, #000 0px, #000 1px, transparent 1px, transparent 4px),
-    repeating-linear-gradient(90deg, #000 0px, #000 1px, transparent 1px, transparent 4px);
-  opacity: 0.35;
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0px, rgba(0, 0, 0, 0.4) 1px, transparent 1px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.4) 0px, rgba(0, 0, 0, 0.4) 1px, transparent 1px, transparent 3px);
   z-index: 2;
+}
+
+.cel-icon__c {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 160px;
+  font-weight: 900;
+  font-family: 'Arial Black', sans-serif;
+  color: #00d4ff;
+  text-shadow: 
+    0 0 60px rgba(0, 212, 255, 0.8),
+    0 0 100px rgba(14, 165, 233, 0.6),
+    0 0 140px rgba(59, 130, 246, 0.4);
+  animation: cPulse 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes cPulse {
+  0% {
+    text-shadow: 
+      0 0 60px rgba(0, 212, 255, 0.8),
+      0 0 100px rgba(14, 165, 233, 0.6),
+      0 0 140px rgba(59, 130, 246, 0.4);
+  }
+  100% {
+    text-shadow: 
+      0 0 80px rgba(0, 212, 255, 1),
+      0 0 130px rgba(14, 165, 233, 0.8),
+      0 0 180px rgba(59, 130, 246, 0.6);
+  }
 }
 
 .cel-splash__title {

@@ -218,27 +218,26 @@ body {
   font-size: 140px;
   font-weight: 900;
   font-family: 'Arial Black', sans-serif;
-  color: #00d4ff;
-  text-shadow: 
-    0 0 60px rgba(0, 212, 255, 0.9),
-    0 0 100px rgba(14, 165, 233, 0.7),
-    0 0 140px rgba(59, 130, 246, 0.5);
+  color: transparent;
+  -webkit-text-stroke: 4px #00d4ff;
+  text-stroke: 4px #00d4ff;
+  filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.8)) 
+          drop-shadow(0 0 40px rgba(14, 165, 233, 0.6))
+          drop-shadow(0 0 60px rgba(59, 130, 246, 0.4));
   animation: cPulse 2.5s ease-in-out infinite alternate;
   line-height: 1;
 }
 
 @keyframes cPulse {
   0% {
-    text-shadow: 
-      0 0 60px rgba(0, 212, 255, 0.9),
-      0 0 100px rgba(14, 165, 233, 0.7),
-      0 0 140px rgba(59, 130, 246, 0.5);
+    filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.8)) 
+            drop-shadow(0 0 40px rgba(14, 165, 233, 0.6))
+            drop-shadow(0 0 60px rgba(59, 130, 246, 0.4));
   }
   100% {
-    text-shadow: 
-      0 0 80px rgba(0, 212, 255, 1),
-      0 0 130px rgba(14, 165, 233, 0.9),
-      0 0 180px rgba(59, 130, 246, 0.7);
+    filter: drop-shadow(0 0 30px rgba(0, 212, 255, 1)) 
+            drop-shadow(0 0 60px rgba(14, 165, 233, 0.8))
+            drop-shadow(0 0 90px rgba(59, 130, 246, 0.6));
   }
 }
 

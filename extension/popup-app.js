@@ -70,12 +70,8 @@
 
       const splashScreen = el('div', { className: 'cel-splash' }, [
         el('div', { className: 'cel-splash__logo' }, [
-          el('div', { className: 'cel-lock-icon' }, [
-            el('div', { className: 'cel-lock-icon__shackle' }),
-            el('div', { className: 'cel-lock-icon__body' }, [
-              el('div', { className: 'cel-lock-icon__logo' }, ['C'])
-            ]),
-            el('div', { className: 'cel-lock-icon__chip' })
+          el('div', { className: 'cel-card-icon' }, [
+            el('div', { className: 'cel-card-icon__chip' })
           ])
         ]),
         el('div', { className: 'cel-splash__title' }, ['Celora Wallet']),

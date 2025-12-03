@@ -30,7 +30,8 @@
       cardsData: null,
       stakingData: null,
       transactionsData: null,
-      settingsData: null
+      settingsData: null,
+      splashShown: false
     },
 
     async init() {
@@ -46,13 +47,55 @@
       // Initialize API
       CeloraAPI.init();
 
-      // Check authentication and render
-      const isAuth = await CeloraAuth.isAuthenticated();
-      if (isAuth) {
-        await this.showWallet();
+      // Check if splash screen should be shown
+      const hasSeenSplash = localStorage.getItem('celora_splash_seen') === 'true';
+      
+      if (!hasSeenSplash) {
+        this.showSplash();
       } else {
-        this.showAuth();
+        // Check authentication and render
+        const isAuth = await CeloraAuth.isAuthenticated();
+        if (isAuth) {
+          await this.showWallet();
+        } else {
+          this.showAuth();
+        }
       }
+    },
+
+    showSplash() {
+      const root = qs('#root');
+      root.innerHTML = '';
+      root.className = 'cel-splash-container';
+
+      const splashScreen = el('div', { className: 'cel-splash' }, [
+        el('div', { className: 'cel-splash__logo' }, [
+          el('div', { className: 'cel-lock-icon' }, [
+            el('div', { className: 'cel-lock-icon__body' }),
+            el('div', { className: 'cel-lock-icon__shackle' }),
+            el('div', { className: 'cel-lock-icon__chip' })
+          ])
+        ]),
+        el('div', { className: 'cel-splash__title' }, ['Celora Wallet']),
+        el('div', { className: 'cel-splash__subtitle' }, ['Secure • Non-custodial • Private']),
+        el('button', {
+          className: 'cel-button cel-button--primary cel-splash__button',
+          onclick: async () => {
+            localStorage.setItem('celora_splash_seen', 'true');
+            this.state.splashShown = true;
+            
+            // Check auth and show appropriate screen
+            const isAuth = await CeloraAuth.isAuthenticated();
+            if (isAuth) {
+              await this.showWallet();
+            } else {
+              this.showAuth();
+            }
+          }
+        }, ['Unlock Wallet'])
+      ]);
+
+      root.appendChild(splashScreen);
     },
 
     showAuth() {

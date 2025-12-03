@@ -37,6 +37,198 @@ body {
   overflow-x: hidden;
 }
 
+/* ========================================
+   SPLASH SCREEN
+   ======================================== */
+
+.cel-splash-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 600px;
+  background: radial-gradient(ellipse at center, #1a2945 0%, #0a1628 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.cel-splash-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(10, 245, 211, 0.1) 0%, transparent 70%);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.cel-splash {
+  text-align: center;
+  z-index: 1;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cel-splash__logo {
+  margin-bottom: 32px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.cel-lock-icon {
+  width: 180px;
+  height: 200px;
+  margin: 0 auto;
+  position: relative;
+  filter: drop-shadow(0 0 40px rgba(10, 245, 211, 0.6)) drop-shadow(0 0 80px rgba(255, 159, 64, 0.4));
+}
+
+.cel-lock-icon__body {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 140px;
+  background: linear-gradient(135deg, #0af5d3 0%, #0066ff 50%, #ff9f40 100%);
+  border-radius: 28px;
+  box-shadow: 
+    inset 0 2px 20px rgba(255, 255, 255, 0.2),
+    0 8px 32px rgba(10, 245, 211, 0.4);
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 
+      inset 0 2px 20px rgba(255, 255, 255, 0.2),
+      0 8px 32px rgba(10, 245, 211, 0.4);
+  }
+  to {
+    box-shadow: 
+      inset 0 2px 20px rgba(255, 255, 255, 0.3),
+      0 8px 48px rgba(10, 245, 211, 0.6),
+      0 0 80px rgba(255, 159, 64, 0.3);
+  }
+}
+
+.cel-lock-icon__shackle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 100px;
+  border: 16px solid;
+  border-image: linear-gradient(135deg, #0af5d3 0%, #0066ff 100%) 1;
+  border-bottom: none;
+  border-radius: 50px 50px 0 0;
+  box-shadow: 0 0 20px rgba(10, 245, 211, 0.5);
+}
+
+.cel-lock-icon__chip {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 40px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  border-radius: 6px;
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(255, 215, 0, 0.6);
+}
+
+.cel-lock-icon__chip::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  background: linear-gradient(135deg, #ff9f40 0%, #ffd700 100%);
+  border-radius: 2px;
+}
+
+.cel-lock-icon__chip::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 26px;
+  height: 16px;
+  background-image: 
+    linear-gradient(#ffaa00 1px, transparent 1px),
+    linear-gradient(90deg, #ffaa00 1px, transparent 1px);
+  background-size: 6px 4px;
+}
+
+.cel-splash__title {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #0af5d3 0%, #0066ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.cel-splash__subtitle {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-bottom: 48px;
+  letter-spacing: 0.5px;
+}
+
+.cel-splash__button {
+  width: 240px;
+  height: 56px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #0af5d3 0%, #0066ff 100%);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 
+    0 4px 24px rgba(10, 245, 211, 0.4),
+    0 0 40px rgba(10, 245, 211, 0.2);
+  transition: all 0.3s ease;
+}
+
+.cel-splash__button:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 32px rgba(10, 245, 211, 0.6),
+    0 0 60px rgba(10, 245, 211, 0.3);
+}
+
+.cel-splash__button:active {
+  transform: translateY(0);
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {

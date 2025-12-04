@@ -76,7 +76,7 @@
             className: 'cel-lock-image'
           }),
           el('img', { 
-            src: 'assets/b3bdb21c-1e40-42a7-b4c4-d45543aa4159.png',
+            src: 'assets/ea912b77-5b64-4248-bbc1-5cb1615c4695.png',
             alt: 'Celora',
             className: 'cel-text-logo'
           })

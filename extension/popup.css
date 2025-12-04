@@ -94,6 +94,20 @@ body {
   50% { transform: translateY(-10px); }
 }
 
+.cel-lock-image {
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 40px rgba(10, 76, 255, 0.6));
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Old CSS lock styles - kept for reference but not used
 .cel-icon {
   width: 260px;
   height: 310px;

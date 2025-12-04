@@ -94,15 +94,6 @@ body {
   50% { transform: translateY(-10px); }
 }
 
-.cel-logo-text-image {
-  width: 420px;
-  height: auto;
-  max-width: 90%;
-  object-fit: contain;
-  filter: drop-shadow(0 0 30px rgba(10, 76, 255, 0.5));
-  margin-bottom: 20px;
-}
-
 .cel-lock-image {
   width: 280px;
   height: 280px;

@@ -74,9 +74,13 @@
             src: 'assets/image-1764871623265.png',
             alt: 'Celora Lock',
             className: 'cel-lock-image'
+          }),
+          el('img', { 
+            src: 'assets/b3bdb21c-1e40-42a7-b4c4-d45543aa4159.png',
+            alt: 'Celora',
+            className: 'cel-text-logo'
           })
         ]),
-        el('div', { className: 'cel-splash__subtitle' }, ['Secure • Non-custodial • Private']),
         el('button', {
           className: 'cel-button cel-button--primary cel-splash__button',
           onclick: async () => {

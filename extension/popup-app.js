@@ -71,9 +71,9 @@
       const splashScreen = el('div', { className: 'cel-splash' }, [
         el('div', { className: 'cel-splash__logo' }, [
           el('img', { 
-            src: 'assets/image-1764871623265.png',
-            alt: 'Celora Lock',
-            className: 'cel-lock-image'
+            src: 'assets/b3bdb21c-1e40-42a7-b4c4-d45543aa4159.png',
+            alt: 'Celora',
+            className: 'cel-logo-text-image'
           })
         ]),
         el('div', { className: 'cel-splash__title' }, ['Celora Wallet']),

@@ -100,7 +100,7 @@ body {
   object-fit: contain;
   filter: drop-shadow(0 0 40px rgba(10, 76, 255, 0.6));
   animation: float 3s ease-in-out infinite;
-  margin: 0;
+  margin-bottom: 15px;
   display: block;
 }
 
@@ -109,7 +109,7 @@ body {
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 0 20px rgba(10, 76, 255, 0.4));
-  margin: 0;
+  margin-bottom: 15px;
   display: block;
 }
 

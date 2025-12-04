@@ -45,7 +45,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 600px;
+  min-height: 500px;
   background: radial-gradient(ellipse at center, #1a2945 0%, #0a1628 100%);
   position: relative;
   overflow: hidden;
@@ -100,16 +100,16 @@ body {
   object-fit: contain;
   filter: drop-shadow(0 0 40px rgba(10, 76, 255, 0.6));
   animation: float 3s ease-in-out infinite;
-  margin-bottom: 8px;
+  margin-bottom: 3px;
   display: block;
 }
 
 .cel-text-logo {
-  width: 300px;
+  width: 280px;
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 0 20px rgba(10, 76, 255, 0.4));
-  margin-bottom: 8px;
+  margin-bottom: 3px;
   display: block;
 }
 

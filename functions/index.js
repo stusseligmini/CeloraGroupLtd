@@ -17,3 +17,13 @@ exports.nextServer = functions.https.onRequest(async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+// ============================================================================
+// CRON JOBS - Scheduled Functions
+// ============================================================================
+
+const cron = require('./cron');
+
+exports.balanceSyncCron = cron.balanceSyncCron;
+exports.transactionMonitorCron = cron.transactionMonitorCron;
+exports.scheduledPaymentsCron = cron.scheduledPaymentsCron;
+

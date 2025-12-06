@@ -8,20 +8,36 @@ export function normalizeMnemonic(input: string): string[] {
 }
 
 export function isLikelyValidMnemonic(words: string[]): boolean {
-  // Basic checks: 12/15/18/21/24 word count and alphabetic
-  const validCounts = new Set([12, 15, 18, 21, 24]);
-  if (!validCounts.has(words.length)) return false;
-  if (!words.every((w) => /^[a-z]+$/.test(w))) return false;
-  // Placeholder for checksum validation; to be replaced with BIP39 later
-  return true;
+  // Use real BIP39 validation with checksum verification
+  const bip39 = require('bip39');
+  const mnemonic = words.join(' ');
+  return bip39.validateMnemonic(mnemonic);
 }
 
 export function deriveAddressPlaceholder(words: string[]): string {
-  // Placeholder derivation: return a deterministic mock based on words length
-  // Replace with actual chain-specific derivation (e.g., Solana ed25519 from mnemonic)
-  const len = words.length;
-  const suffix = String(len).padStart(2, '0');
-  return `MockAddress_${suffix}_${Math.abs(hash(words.join(' '))).toString(16).slice(0, 8)}`;
+  // Real BIP39/BIP44 derivation for Solana
+  const bip39 = require('bip39');
+  const { derivePath } = require('ed25519-hd-key');
+  const { Keypair } = require('@solana/web3.js');
+  
+  const mnemonic = words.join(' ');
+  
+  // Validate before deriving
+  if (!bip39.validateMnemonic(mnemonic)) {
+    throw new Error('Invalid mnemonic');
+  }
+  
+  // Generate seed from mnemonic
+  const seed = bip39.mnemonicToSeedSync(mnemonic);
+  
+  // Derive keypair using BIP44 path for Solana (m/44'/501'/0'/0')
+  const path = `m/44'/501'/0'/0'`;
+  const derivedSeed = derivePath(path, seed.toString('hex')).key;
+  
+  // Create Solana keypair
+  const keypair = Keypair.fromSeed(derivedSeed);
+  
+  return keypair.publicKey.toString();
 }
 
 function hash(s: string): number {

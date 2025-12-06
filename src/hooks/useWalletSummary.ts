@@ -36,7 +36,15 @@ export function useWalletSummary() {
 
       // successResponse() returns the validated data directly
       if (response && typeof response === 'object') {
-        setState({ summary: response, loading: false, error: null });
+        // Normalize to ensure holdings is always an array
+        const safeSummary: WalletSummary = {
+          totalBalance: response.totalBalance ?? 0,
+          currency: response.currency ?? 'USD',
+          holdings: Array.isArray((response as any).holdings) ? (response as any).holdings : [],
+          lastUpdated: (response as any).lastUpdated ?? new Date().toISOString(),
+        };
+
+        setState({ summary: safeSummary, loading: false, error: null });
       } else {
         console.error('Invalid wallet summary response:', response);
         throw new Error('Invalid wallet summary response');

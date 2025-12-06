@@ -16,6 +16,10 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  confirmPasswordReset as firebaseConfirmPasswordReset,
+  updateEmail,
+  updateProfile,
   User as FirebaseUser
 } from 'firebase/auth';
 import { setApiAuthToken } from '@/lib/apiClient';
@@ -24,6 +28,8 @@ export type AuthUser = {
   id: string;
   email: string | null;
   isAnonymous: boolean;
+  name?: string | null;
+  photoURL?: string | null;
   username?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -33,7 +39,7 @@ export type AuthSession = {
   expiresAt?: number;
 };
 
-export type AuthResult = { error?: Error };
+export type AuthResult = { error?: Error; success?: boolean };
 
 export interface AuthContextValue {
   user: AuthUser | null;
@@ -60,6 +66,8 @@ function normalizeFirebaseUser(firebaseUser: FirebaseUser | null): AuthUser | nu
     id: firebaseUser.uid,
     email: firebaseUser.email,
     isAnonymous: firebaseUser.isAnonymous,
+    name: firebaseUser.displayName,
+    photoURL: firebaseUser.photoURL,
     metadata: {
       createdAt: firebaseUser.metadata.creationTime,
       lastSignIn: firebaseUser.metadata.lastSignInTime,
@@ -271,8 +279,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const triggerPasswordReset = useCallback(async (email: string): Promise<AuthResult> => {
     setError(null);
     try {
-      // TODO: Implement password reset with Firebase
-      return {};
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
     } catch (err) {
       const failure = err instanceof Error ? err : new Error('Failed to trigger password reset');
       setError(failure);
@@ -283,8 +291,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const confirmPasswordReset = useCallback(async (code: string, newPassword: string): Promise<AuthResult> => {
     setError(null);
     try {
-      // TODO: Implement password reset confirmation with Firebase
-      return {};
+      await firebaseConfirmPasswordReset(auth, code, newPassword);
+      return { success: true };
     } catch (err) {
       const failure = err instanceof Error ? err : new Error('Failed to confirm password reset');
       setError(failure);
@@ -295,9 +303,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUser = useCallback(async (updates: Partial<AuthUser>) => {
     setError(null);
     try {
-      // TODO: Implement user update with Firebase
-      if (user) {
-        setUser({ ...user, ...updates });
+      if (auth.currentUser) {
+        const profileUpdates: { displayName?: string; photoURL?: string } = {};
+        if (updates.name) profileUpdates.displayName = updates.name;
+        if (updates.photoURL) profileUpdates.photoURL = updates.photoURL;
+        
+        if (Object.keys(profileUpdates).length > 0) {
+          await updateProfile(auth.currentUser, profileUpdates);
+        }
+        
+        if (updates.email && updates.email !== auth.currentUser.email) {
+          await updateEmail(auth.currentUser, updates.email);
+        }
+        
+        if (user) {
+          setUser({ ...user, ...updates });
+        }
       }
     } catch (err) {
       const failure = err instanceof Error ? err : new Error('Failed to update user');

@@ -208,6 +208,7 @@ export interface WalletHolding {
   label: string;
   balance: number;
   currency: string;
+  address?: string;
 }
 
 export interface WalletSummary {

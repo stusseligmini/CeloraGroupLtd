@@ -15,6 +15,7 @@ export interface BitcoinRPCConfig {
   primary: string;
   fallbacks: string[];
   network: bitcoin.Network;
+  testnet?: boolean;
 }
 
 export class BitcoinClient {
@@ -77,9 +78,32 @@ export class BitcoinClient {
   }
 
   async getUnspentOutputs(address: string): Promise<Array<{ txid: string; vout: number; value: number }>> {
-    // In production, use a Bitcoin RPC node or block explorer API
-    // This is a placeholder
-    return [];
+    try {
+      const apiKey = process.env.BLOCKCHAIR_API_KEY || '';
+      const network = this.config.testnet ? 'bitcoin/testnet' : 'bitcoin';
+      const url = `https://api.blockchair.com/${network}/dashboards/address/${address}${apiKey ? `?key=${apiKey}` : ''}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Blockchair API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const addressData = data.data?.[address];
+      
+      if (!addressData || !addressData.utxo) {
+        return [];
+      }
+      
+      return addressData.utxo.map((utxo: any) => ({
+        txid: utxo.transaction_hash,
+        vout: utxo.index,
+        value: utxo.value,
+      }));
+    } catch (error) {
+      logger.error('Failed to get Bitcoin UTXOs', error);
+      return [];
+    }
   }
 
   async sendTransaction(

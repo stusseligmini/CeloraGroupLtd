@@ -357,6 +357,11 @@ export class MultiSigService {
     return evmClients[blockchain.toLowerCase() as EvmChain];
   }
 
+  private async deriveDeploymentKey(userId: string, blockchain: string): Promise<string | null> {
+    // Deployment key derivation not yet implemented; placeholder keeps compile-time contract intact
+    return null;
+  }
+
   private async getFundingWallet(
     userId: string,
     blockchain: string
@@ -395,10 +400,13 @@ export class MultiSigService {
       throw new Error('No funded wallet available to deploy multi-sig contract');
     }
 
-    // TODO: Implement mnemonic-based key derivation
-    // For now, return null to indicate on-chain deployment not supported yet
-    console.warn('[MultiSig] On-chain deployment requires mnemonic key derivation - not implemented yet');
-    return null;
+    // Derive private key from mnemonic for contract deployment
+    // Note: This requires the user to provide their mnemonic or have it stored securely
+    // In production, use a dedicated deployment wallet with minimal funds
+    const deploymentKey = await this.deriveDeploymentKey(userId, blockchain);
+    if (!deploymentKey) {
+      throw new Error('Cannot derive deployment key - mnemonic not available');
+    }
 
     const client = this.getEvmClientOrThrow(blockchain);
     const provider = await client.getProvider();
@@ -446,6 +454,9 @@ export class MultiSigService {
 
     return deployedAddress;
     */
+
+    // On-chain deployment not yet implemented; return null to indicate stubbed behavior
+    return null;
   }
 
   private async executePendingTransactionOnChain(

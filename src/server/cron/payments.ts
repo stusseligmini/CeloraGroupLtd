@@ -71,8 +71,29 @@ async function processScheduledPayments() {
             throw new Error('Wallet not found for scheduled payment');
           }
 
-          // TODO: Implement broadcastTransaction function
-          throw new Error('broadcastTransaction not yet implemented');
+          // IMPORTANT: Scheduled payments cannot be executed server-side in a non-custodial wallet
+          // This would require storing private keys on the server, which violates security principles
+          // Instead, scheduled payments should be handled via:
+          // 1. Client-side scheduling (extension/app triggers when running)
+          // 2. Smart contract automation (on-chain scheduling)
+          // 3. Custodial sub-wallet with limited funds specifically for scheduled payments
+          
+          logger.warn(`[CRON] Scheduled payment ${payment.id} requires client-side execution (non-custodial wallet)`);
+          logger.info(`  From: ${payment.wallet.address} (${payment.wallet.blockchain})`);
+          logger.info(`  To: ${payment.toAddress}`);
+          logger.info(`  Amount: ${payment.amount}`);
+
+          // Mark as pending and notify user to execute manually
+          await prisma.scheduledPaymentExecution.create({
+            data: {
+              paymentId: payment.id,
+              status: 'pending',
+              amount: payment.amount,
+              errorMessage: 'Awaiting client-side execution',
+            },
+          });
+
+          continue;
           
           // Unreachable code below (will be enabled when broadcastTransaction is implemented)
           /* 

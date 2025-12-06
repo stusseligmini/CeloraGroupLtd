@@ -82,8 +82,46 @@ export class NFTService {
   private async fetchSolanaNFTs(address: string): Promise<NFT[]> {
     try {
       // Use Metaplex or similar service for Solana NFTs
-      // This is a placeholder - implement with actual Solana NFT fetching
-      return [];
+      // Use Helius DAS (Digital Asset Standard) API for Solana NFTs
+      const heliusApiKey = process.env.HELIUS_API_KEY;
+      if (!heliusApiKey) {
+        console.warn('HELIUS_API_KEY not configured - cannot fetch Solana NFTs');
+        return [];
+      }
+
+      const url = `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'nft-fetch',
+          method: 'getAssetsByOwner',
+          params: {
+            ownerAddress: address,
+            page: 1,
+            limit: 1000,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Helius DAS API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const assets = data.result?.items || [];
+
+      return assets
+        .filter((asset: any) => asset.interface === 'V1_NFT' || asset.interface === 'ProgrammableNFT')
+        .map((asset: any) => ({
+          tokenId: asset.id,
+          name: asset.content?.metadata?.name || 'Unknown',
+          description: asset.content?.metadata?.description || '',
+          imageUrl: asset.content?.links?.image || asset.content?.files?.[0]?.uri || '',
+          collectionName: asset.grouping?.find((g: any) => g.group_key === 'collection')?.group_value || '',
+          attributes: asset.content?.metadata?.attributes || [],
+        }));
     } catch (error) {
       logger.error('Error fetching Solana NFTs', error, { address });
       return [];

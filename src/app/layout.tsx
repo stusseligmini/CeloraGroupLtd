@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { AuthProvider } from '../providers/AuthProvider'
 import { ThemeProvider } from '../providers/ThemeProvider'
 import { ToastProvider } from '../providers/ToastProvider'
@@ -32,12 +33,51 @@ export const viewport = {
   viewportFit: 'cover',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const nonce = '';
+  const pathHeader = await headers();
+  const path =
+    pathHeader.get('x-invoke-path') ||
+    pathHeader.get('x-pathname') ||
+    pathHeader.get('next-url') ||
+    '';
+  const isTelegram = path.startsWith('/telegram');
+
+  const telegramShell = (
+    <TelegramMiniAppProvider>
+      <AuthProvider>
+        <AppCheckProvider>
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </AppCheckProvider>
+      </AuthProvider>
+    </TelegramMiniAppProvider>
+  );
+
+  const defaultShell = (
+    <ThemeProvider>
+      <TelemetryProvider>
+        <ErrorBoundary>
+          <TelegramMiniAppProvider>
+            <AuthProvider>
+              <AppCheckProvider>
+                {children}
+              </AppCheckProvider>
+            </AuthProvider>
+          </TelegramMiniAppProvider>
+        </ErrorBoundary>
+        <DevToolsWarning />
+        <DevModeBanner />
+        <ToastProvider />
+        <ServiceWorkerRegistration />
+      </TelemetryProvider>
+    </ThemeProvider>
+  );
   
   return (
     <html lang="en" className="dark">
@@ -64,23 +104,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-96x96.png" />
       </head>
       <body className="min-h-screen bg-slate-900 antialiased">
-        <ThemeProvider>
-          <TelemetryProvider>
-            <ErrorBoundary>
-              <TelegramMiniAppProvider>
-                <AuthProvider>
-                  <AppCheckProvider>
-                    {children}
-                  </AppCheckProvider>
-                </AuthProvider>
-              </TelegramMiniAppProvider>
-            </ErrorBoundary>
-            <DevToolsWarning />
-            <DevModeBanner />
-            <ToastProvider />
-            <ServiceWorkerRegistration />
-          </TelemetryProvider>
-        </ThemeProvider>
+        {isTelegram ? telegramShell : defaultShell}
       </body>
     </html>
   )

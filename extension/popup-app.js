@@ -725,8 +725,109 @@
       await renderQR();
     },
 
-    openSwapModal() {
-      this.showModal({ title: '🔁 Swap', content: 'Token swap coming soon.', confirmText: 'OK', cancelText: null });
+    async openSwapModal() {
+      const address = await WalletStore.getAddress();
+      if (!address) {
+        this.showModal({ title: '🔁 Swap', content: 'No wallet found. Create or import a wallet first.', confirmText: 'OK', cancelText: null });
+        return;
+      }
+
+      const form = el('div', { class: 'swap-form' }, [
+        el('label', null, ['From Token:']),
+        el('select', { id: 'swap-from-token', class: 'cel-select' }, [
+          el('option', { value: 'So11111111111111111111111111111111111111112' }, ['SOL']),
+          el('option', { value: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }, ['USDC']),
+          el('option', { value: 'Es9vMFrzaCERZzW1Yw4qF9hQxNxqzqH7h1gW4P3AfkG' }, ['USDT']),
+        ]),
+        el('br'),
+        el('label', null, ['To Token:']),
+        el('select', { id: 'swap-to-token', class: 'cel-select' }, [
+          el('option', { value: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }, ['USDC']),
+          el('option', { value: 'So11111111111111111111111111111111111111112' }, ['SOL']),
+          el('option', { value: 'Es9vMFrzaCERZzW1Yw4qF9hQxNxqzqH7h1gW4P3AfkG' }, ['USDT']),
+        ]),
+        el('br'),
+        el('label', null, ['Amount:']),
+        el('input', { type: 'number', id: 'swap-amount', class: 'cel-input', placeholder: '0.0', step: '0.01' }),
+        el('br'),
+        el('div', { id: 'swap-quote', style: 'margin-top: 12px; padding: 10px; background: rgba(10, 245, 211, 0.1); border-radius: 8px; display: none;' }),
+      ]);
+
+      const modal = await this.showModal({
+        title: '🔁 Token Swap',
+        content: form,
+        confirmText: 'Get Quote',
+        cancelText: 'Cancel',
+      });
+
+      if (modal) {
+        const fromToken = document.getElementById('swap-from-token').value;
+        const toToken = document.getElementById('swap-to-token').value;
+        const amount = document.getElementById('swap-amount').value;
+
+        if (!amount || parseFloat(amount) <= 0) {
+          this.showModal({ title: 'Error', content: 'Please enter a valid amount.', confirmText: 'OK', cancelText: null });
+          return;
+        }
+
+        // Get quote
+        try {
+          this.showModal({ title: '🔁 Fetching Quote...', content: el('div', { class: 'cel-loading' }, [
+            el('div', { class: 'cel-loading__spinner' }),
+            el('div', { class: 'cel-loading__label' }, ['Please wait'])
+          ]), confirmText: null, cancelText: null });
+
+          const fromDecimals = fromToken === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+          const amountLamports = Math.floor(parseFloat(amount) * Math.pow(10, fromDecimals));
+
+          const quote = await JupiterSwap.getQuote(fromToken, toToken, amountLamports);
+          
+          const toDecimals = toToken === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+          const outputAmount = JupiterSwap.formatAmount(quote.outAmount, toDecimals);
+
+          const quoteConfirm = await this.showModal({
+            title: '📊 Swap Quote',
+            content: el('div', null, [
+              el('p', null, [`You will receive approximately ${outputAmount} tokens`]),
+              el('p', { style: 'font-size: 11px; color: var(--color-text-muted);' }, [`Price impact: ${(quote.priceImpactPct || 0).toFixed(2)}%`]),
+              el('br'),
+              el('label', null, ['Enter password to confirm:']),
+              el('input', { type: 'password', id: 'swap-password', class: 'cel-input', placeholder: 'Wallet password' }),
+            ]),
+            confirmText: 'Execute Swap',
+            cancelText: 'Cancel',
+          });
+
+          if (quoteConfirm) {
+            const password = document.getElementById('swap-password').value;
+            
+            this.showModal({ title: '🔁 Executing Swap...', content: el('div', { class: 'cel-loading' }, [
+              el('div', { class: 'cel-loading__spinner' }),
+              el('div', { class: 'cel-loading__label' }, ['Signing transaction'])
+            ]), confirmText: null, cancelText: null });
+
+            // Execute swap
+            const result = await JupiterSwap.executeSwap(quote, address, async (txBuffer) => {
+              const encData = await WalletStore.getEncryptedData();
+              const keys = await walletSigningModule.recoverKeysFromStorage(password, encData);
+              return await walletSigningModule.signTransaction(txBuffer, keys.secretKey);
+            });
+
+            this.showModal({
+              title: '✅ Swap Successful',
+              content: el('p', null, [`Transaction: ${result.signature.slice(0, 8)}...${result.signature.slice(-8)}`]),
+              confirmText: 'OK',
+              cancelText: null,
+            });
+
+            // Refresh balance
+            this.renderWalletTab();
+          }
+        } catch (error) {
+          console.error('Swap failed:', error);
+          this.showModal({ title: 'Swap Failed', content: error.message || 'An error occurred', confirmText: 'OK', cancelText: null });
+        }
+      }
     },
 
     openBuyModal(address) {

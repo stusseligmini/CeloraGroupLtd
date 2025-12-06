@@ -68,12 +68,12 @@ export async function GET(request: NextRequest) {
 
     const summary = await getWalletSummary(userId, token);
 
-    // Adapt minimal summary to API schema shape expected by clients
+    // Return in the shape expected by clients
     const payload = {
-      totalFiatBalance: summary.totalBalance ?? 0,
-      fiatCurrency: summary.currency ?? 'USD',
-      wallets: [],
-      recentTransactions: [],
+      totalBalance: summary.totalBalance ?? 0,
+      currency: summary.currency ?? 'USD',
+      holdings: Array.isArray(summary.holdings) ? summary.holdings : [],
+      lastUpdated: summary.lastUpdated ?? new Date().toISOString(),
     };
 
     // Validate response against schema

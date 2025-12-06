@@ -6,7 +6,6 @@
 
 import { useEffect } from 'react';
 import { initTelegramWebApp, getTelegramTheme } from '@/lib/telegram/webapp';
-import { AuthProvider } from '@/providers/AuthProvider';
 import '../globals.css';
 
 export default function TelegramLayout({
@@ -37,31 +36,11 @@ export default function TelegramLayout({
   }, []);
   
   return (
-    <html lang="en">
-      <head>
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-      </head>
-      <body className="telegram-mini-app">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
-      </body>
-    </html>
+    <div className="telegram-mini-app bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen">
+      {children}
+    </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
